@@ -221,7 +221,7 @@ describe('resolveBinding', () => {
 
   describe('local bindings', () => {
     it('resolves local variables', () => {
-      ctx.locals = new Map([['temp', 42], ['name', 'local']]);
+      ctx.locals = new Map<string, unknown>([['temp', 42], ['name', 'local']]);
 
       expect(resolveBinding('@temp', ctx)).toBe(42);
       expect(resolveBinding('@name', ctx)).toBe('local');

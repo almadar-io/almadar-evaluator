@@ -16,8 +16,8 @@
     "vitest": "catalog:"
   },
   "scripts": {
-    "build": "echo 'Skipping build - source-only package'",
+    "build": "tsc --noEmit",
     "test": "vitest",
-    "typecheck": "tsc --noEmit || true"
+    "typecheck": "tsc --noEmit"
   }
 }
