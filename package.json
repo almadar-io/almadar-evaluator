@@ -1,0 +1,23 @@
+{
+  "name": "@almadar/evaluator",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./operators": "./operators/index.ts"
+  },
+  "dependencies": {
+    "@almadar/std": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "scripts": {
+    "build": "echo 'Skipping build - source-only package'",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit || true"
+  }
+}
