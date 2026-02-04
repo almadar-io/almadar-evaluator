@@ -1,23 +1,52 @@
 {
   "name": "@almadar/evaluator",
   "version": "1.0.0",
-  "private": true,
-  "main": "./index.ts",
-  "types": "./index.ts",
+  "description": "S-expression evaluator for Almadar",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./index.ts",
-    "./operators": "./operators/index.ts"
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./operators": {
+      "import": "./dist/operators/index.js",
+      "types": "./dist/operators/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "@almadar/std": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
   },
-  "scripts": {
-    "build": "tsc --noEmit",
-    "test": "vitest",
-    "typecheck": "tsc --noEmit"
-  }
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/almadar-io/almadar.git",
+    "directory": "packages/almadar-evaluator"
+  },
+  "license": "MIT",
+  "keywords": [
+    "almadar",
+    "evaluator",
+    "s-expression",
+    "sexpr"
+  ]
 }
