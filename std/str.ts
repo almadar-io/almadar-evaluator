@@ -24,6 +24,20 @@ export function evalStrLen(
 }
 
 /**
+ * str/concat - Concatenate strings together
+ */
+export function evalStrConcat(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): string {
+  return args.map(arg => {
+    const val = evaluate(arg, ctx);
+    return val !== null && val !== undefined ? String(val) : '';
+  }).join('');
+}
+
+/**
  * str/upper - Convert to uppercase
  */
 export function evalStrUpper(

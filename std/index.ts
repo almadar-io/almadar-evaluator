@@ -29,6 +29,7 @@ export {
 // String operators
 export {
   evalStrLen,
+  evalStrConcat,
   evalStrUpper,
   evalStrLower,
   evalStrTrim,

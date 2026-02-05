@@ -362,6 +362,8 @@ export class SExpressionEvaluator {
       // ===============================
       case 'str/len':
         return stdStr.evalStrLen(args, evaluate, ctx);
+      case 'str/concat':
+        return stdStr.evalStrConcat(args, evaluate, ctx);
       case 'str/upper':
         return stdStr.evalStrUpper(args, evaluate, ctx);
       case 'str/lower':
