@@ -6,7 +6,7 @@
  * @packageDocumentation
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   createMinimalContext,
   createEffectContext,
@@ -62,9 +62,9 @@ describe('Context Creation', () => {
     it('adds effect handlers to base context', () => {
       const base = createMinimalContext();
       const handlers = {
-        mutateEntity: () => {},
-        emit: () => {},
-        navigate: () => {},
+        mutateEntity: () => { },
+        emit: () => { },
+        navigate: () => { },
       };
 
       const ctx = createEffectContext(base, handlers);
