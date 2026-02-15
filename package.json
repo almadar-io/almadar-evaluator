@@ -1,6 +1,6 @@
 {
   "name": "@almadar/evaluator",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "S-expression evaluator for Almadar",
   "type": "module",
   "main": "./dist/index.js",
@@ -30,8 +30,8 @@
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "@almadar/operators": "workspace:*",
-    "@almadar/std": "workspace:*"
+    "@almadar/core": "workspace:*",
+    "@almadar/operators": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
