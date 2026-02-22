@@ -51,6 +51,12 @@ export interface EvaluationContext {
   /** Local variables from 'let' bindings */
   locals?: Map<string, unknown>;
 
+  /**
+   * When true, log warnings when bindings resolve to undefined. (RCG-01)
+   * Helps detect typos and missing entity fields early.
+   */
+  strictBindings?: boolean;
+
   // ============================================================================
   // Effect Handlers (for executing side effects)
   // ============================================================================
@@ -181,15 +187,36 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): unknown
   }
 
   // Navigate path
-  for (const segment of path) {
+  for (let i = 0; i < path.length; i++) {
+    const segment = path[i];
     if (value === null || value === undefined) {
+      if (ctx.strictBindings) {
+        const resolvedSoFar = [root, ...path.slice(0, i)].join('.');
+        console.warn(
+          `[Binding] @${root}.${path.join('.')} resolved to undefined ` +
+          `(failed at "${segment}" — @${resolvedSoFar} is ${value === null ? 'null' : 'undefined'})`
+        );
+      }
       return undefined;
     }
     if (typeof value === 'object') {
       value = (value as Record<string, unknown>)[segment];
     } else {
+      if (ctx.strictBindings) {
+        const resolvedSoFar = [root, ...path.slice(0, i)].join('.');
+        console.warn(
+          `[Binding] @${root}.${path.join('.')} resolved to undefined ` +
+          `(cannot navigate "${segment}" on non-object at @${resolvedSoFar})`
+        );
+      }
       return undefined;
     }
+  }
+
+  if (value === undefined && path.length > 0 && ctx.strictBindings) {
+    console.warn(
+      `[Binding] @${root}.${path.join('.')} resolved to undefined`
+    );
   }
 
   return value;
