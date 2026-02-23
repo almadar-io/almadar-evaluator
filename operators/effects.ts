@@ -78,17 +78,42 @@ export function evalEmit(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCont
 }
 
 /**
- * Evaluate persist: ["persist", action] or ["persist", action, data]
- * Actions: "create", "update", "delete"
+ * Evaluate persist:
+ * - ["persist", action] or ["persist", action, data]
+ *   Actions: "create", "update", "delete"
+ * - ["persist", "batch", [...operations]]
+ *   Batch action for atomic multi-document writes.
+ *   Each operation is an S-expression: ["create", "collection", {...data}],
+ *   ["update", "collection", "id", {...data}], or ["delete", "collection", "id"].
  */
 export function evalPersist(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): void {
-  const action = args[0] as 'create' | 'update' | 'delete';
-  const data = args.length > 1 ? (evaluate(args[1], ctx) as Record<string, unknown>) : ctx.payload;
+  const action = args[0] as 'create' | 'update' | 'delete' | 'batch';
 
   if (!ctx.persist) {
     console.warn('No persist handler in context for persist effect');
     return;
   }
+
+  if (action === 'batch') {
+    // Batch mode: ["persist", "batch", [...operations]]
+    const rawOps = args[1];
+    if (!Array.isArray(rawOps)) {
+      console.warn('persist batch requires an array of operations as second argument');
+      return;
+    }
+    // Evaluate each operation's data arguments
+    const operations = rawOps.map((op) => {
+      if (!Array.isArray(op)) return op;
+      return (op as SExpr[]).map((item) => evaluate(item, ctx));
+    });
+    ctx.persist('batch', { operations } as Record<string, unknown>).catch((err) => {
+      console.error('Persist batch failed:', err);
+    });
+    return;
+  }
+
+  // Single operation mode
+  const data = args.length > 1 ? (evaluate(args[1], ctx) as Record<string, unknown>) : ctx.payload;
 
   // Fire and forget (async)
   ctx.persist(action, data as Record<string, unknown>).catch((err) => {

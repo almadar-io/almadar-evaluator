@@ -195,6 +195,7 @@ export {
 // Async operators
 export {
   evalAsyncDelay,
+  evalAsyncInterval,
   evalAsyncTimeout,
   evalAsyncDebounce,
   evalAsyncThrottle,
@@ -204,4 +205,5 @@ export {
   evalAsyncSequence,
   clearDebounceTimers,
   clearThrottleTimestamps,
+  clearIntervalTimers,
 } from './async.js';

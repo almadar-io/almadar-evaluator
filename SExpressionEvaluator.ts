@@ -672,6 +672,8 @@ export class SExpressionEvaluator {
       // ===============================
       case 'async/delay':
         return stdAsync.evalAsyncDelay(args, evaluate, ctx);
+      case 'async/interval':
+        return stdAsync.evalAsyncInterval(args, evaluate, ctx);
       case 'async/timeout':
         return stdAsync.evalAsyncTimeout(args, evaluate, ctx);
       case 'async/debounce':

@@ -70,8 +70,8 @@ export interface EvaluationContext {
   /** Navigate to a route */
   navigate?: (route: string, params?: Record<string, unknown>) => void;
 
-  /** Persist data (create/update/delete) */
-  persist?: (action: 'create' | 'update' | 'delete', data?: Record<string, unknown>) => Promise<void>;
+  /** Persist data (create/update/delete/batch) */
+  persist?: (action: 'create' | 'update' | 'delete' | 'batch', data?: Record<string, unknown>) => Promise<void>;
 
   /** Show a notification */
   notify?: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;

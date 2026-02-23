@@ -18,16 +18,58 @@ const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 // Throttle timestamps keyed by event name
 const throttleTimestamps = new Map<string, number>();
 
+// Interval timers keyed by a generated ID
+const intervalTimers = new Map<string, ReturnType<typeof setInterval>>();
+let intervalIdCounter = 0;
+
 /**
- * async/delay - Wait for specified milliseconds
+ * async/delay - Wait for specified milliseconds, optionally execute an effect after
+ *
+ * 1-arg form: ["async/delay", ms] — just wait
+ * 2-arg form: ["async/delay", ms, effect] — wait, then execute effect
  */
 export async function evalAsyncDelay(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Promise<void> {
+): Promise<unknown> {
   const ms = evaluate(args[0], ctx) as number;
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  await new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  // 2-arg form: execute effect after delay
+  if (args.length >= 2 && args[1] !== undefined) {
+    return evaluate(args[1], ctx);
+  }
+
+  return undefined;
+}
+
+/**
+ * async/interval - Execute an effect periodically
+ *
+ * ["async/interval", ms, effect] — execute effect every ms milliseconds
+ *
+ * Returns an interval ID string that can be used with clearIntervalTimers().
+ */
+export function evalAsyncInterval(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): string {
+  const ms = evaluate(args[0], ctx) as number;
+  const effect = args[1];
+  const id = `interval_${++intervalIdCounter}`;
+
+  const timer = setInterval(() => {
+    try {
+      evaluate(effect, ctx);
+    } catch {
+      // Effect errors in interval should not crash the timer
+    }
+  }, ms);
+
+  intervalTimers.set(id, timer);
+  return id;
 }
 
 /**
@@ -207,4 +249,14 @@ export function clearDebounceTimers(): void {
  */
 export function clearThrottleTimestamps(): void {
   throttleTimestamps.clear();
+}
+
+/**
+ * Clear interval timers (for testing/cleanup)
+ */
+export function clearIntervalTimers(): void {
+  for (const timer of intervalTimers.values()) {
+    clearInterval(timer);
+  }
+  intervalTimers.clear();
 }
