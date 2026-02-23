@@ -1,6 +1,6 @@
 {
   "name": "@almadar/evaluator",
-  "version": "1.0.16",
+  "version": "2.0.0",
   "description": "S-expression evaluator for Almadar",
   "type": "module",
   "main": "./dist/index.js",
@@ -30,8 +30,8 @@
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "@almadar/core": "workspace:*",
-    "@almadar/operators": "workspace:*"
+    "@almadar/core": ">=2.0.0",
+    "@almadar/operators": ">=2.0.0"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
@@ -40,8 +40,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/almadar-io/almadar.git",
-    "directory": "packages/almadar-evaluator"
+    "url": "https://github.com/almadar-io/almadar-evaluator.git"
   },
   "license": "MIT",
   "keywords": [
