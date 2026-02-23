@@ -40,7 +40,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/almadar-io/almadar-evaluator.git"
+    "url": "https://github.com/almadar-io/almadar.git",
+    "directory": "docs/packages/evaluator"
   },
   "license": "MIT",
   "keywords": [
@@ -48,5 +49,6 @@
     "evaluator",
     "s-expression",
     "sexpr"
-  ]
+  ],
+  "homepage": "https://github.com/almadar-io/almadar#readme"
 }
