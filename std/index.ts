@@ -207,3 +207,23 @@ export {
   clearThrottleTimestamps,
   clearIntervalTimers,
 } from './async.js';
+
+// Probabilistic operators
+export {
+  evalProbSeed,
+  evalProbFlip,
+  evalProbGaussian,
+  evalProbUniform,
+  evalProbBeta,
+  evalProbCategorical,
+  evalProbPoisson,
+  evalProbCondition,
+  evalProbSample,
+  evalProbPosterior,
+  evalProbInfer,
+  evalProbExpectedValue,
+  evalProbVariance,
+  evalProbHistogram,
+  evalProbPercentile,
+  evalProbCredibleInterval,
+} from './prob.js';

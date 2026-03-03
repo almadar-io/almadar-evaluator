@@ -57,6 +57,19 @@ export interface EvaluationContext {
    */
   strictBindings?: boolean;
 
+  /**
+   * Set by prob/condition when a predicate fails during inference.
+   * Checked by prob/posterior and prob/infer to reject samples.
+   */
+  _probRejected?: boolean;
+
+  /**
+   * Seeded PRNG state for deterministic probabilistic sampling.
+   * Stored as a mutable object so child contexts share the same state.
+   * Set by prob/seed.
+   */
+  _probSeed?: { state: number };
+
   // ============================================================================
   // Effect Handlers (for executing side effects)
   // ============================================================================

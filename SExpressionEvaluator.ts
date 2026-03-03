@@ -74,6 +74,7 @@ import * as stdValidate from './std/validate.js';
 import * as stdTime from './std/time.js';
 import * as stdFormat from './std/format.js';
 import * as stdAsync from './std/async.js';
+import * as stdProb from './std/prob.js';
 
 /**
  * JIT compilation cache for hot paths.
@@ -690,6 +691,44 @@ export class SExpressionEvaluator {
         return stdAsync.evalAsyncAll(args, evaluate, ctx);
       case 'async/sequence':
         return stdAsync.evalAsyncSequence(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: prob/*
+      // ===============================
+      case 'prob/seed':
+        stdProb.evalProbSeed(args, evaluate, ctx);
+        return undefined;
+      case 'prob/flip':
+        return stdProb.evalProbFlip(args, evaluate, ctx);
+      case 'prob/gaussian':
+        return stdProb.evalProbGaussian(args, evaluate, ctx);
+      case 'prob/uniform':
+        return stdProb.evalProbUniform(args, evaluate, ctx);
+      case 'prob/beta':
+        return stdProb.evalProbBeta(args, evaluate, ctx);
+      case 'prob/categorical':
+        return stdProb.evalProbCategorical(args, evaluate, ctx);
+      case 'prob/poisson':
+        return stdProb.evalProbPoisson(args, evaluate, ctx);
+      case 'prob/condition':
+        stdProb.evalProbCondition(args, evaluate, ctx);
+        return undefined;
+      case 'prob/sample':
+        return stdProb.evalProbSample(args, evaluate, ctx);
+      case 'prob/posterior':
+        return stdProb.evalProbPosterior(args, evaluate, ctx);
+      case 'prob/infer':
+        return stdProb.evalProbInfer(args, evaluate, ctx);
+      case 'prob/expected-value':
+        return stdProb.evalProbExpectedValue(args, evaluate, ctx);
+      case 'prob/variance':
+        return stdProb.evalProbVariance(args, evaluate, ctx);
+      case 'prob/histogram':
+        return stdProb.evalProbHistogram(args, evaluate, ctx);
+      case 'prob/percentile':
+        return stdProb.evalProbPercentile(args, evaluate, ctx);
+      case 'prob/credible-interval':
+        return stdProb.evalProbCredibleInterval(args, evaluate, ctx);
 
       default:
         console.warn(`Unknown operator: ${op}`);
