@@ -415,6 +415,8 @@ export class SExpressionEvaluator {
         return stdStr.evalStrTemplate(args, evaluate, ctx);
       case 'str/truncate':
         return stdStr.evalStrTruncate(args, evaluate, ctx);
+      case 'to-string':
+        return String(evaluate(args[0], ctx));
 
       // ===============================
       // Standard Library: array/*
