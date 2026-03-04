@@ -32,7 +32,6 @@ jobs:
         with:
           repository: almadar-io/almadar-test-schemas
           path: almadar-test-schemas
-          token: ${{ secrets.ALMADAR_GITHUB_TOKEN }}
 
       - name: Link test schemas to expected path
         run: ln -sf ${{ github.workspace }}/almadar-test-schemas ../almadar-test-schemas
