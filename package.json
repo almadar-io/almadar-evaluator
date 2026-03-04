@@ -27,7 +27,8 @@
     "build:watch": "tsup --watch",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "pnpm run build",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@almadar/core": ">=2.0.0",
