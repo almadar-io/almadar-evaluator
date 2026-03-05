@@ -330,7 +330,7 @@ describe('SExpressionEvaluator', () => {
     it('evaluates map', () => {
       ctx = { ...ctx, entity: { ...ctx.entity, numbers: [1, 2, 3] } };
       const result = evaluate(
-        ['map', '@entity.numbers', ['fn', 'x', ['*', '@x', 2]]],
+        ['map', '@entity.numbers', ['*', '@item', 2]],
         ctx
       );
       expect(result).toEqual([2, 4, 6]);
@@ -339,7 +339,7 @@ describe('SExpressionEvaluator', () => {
     it('evaluates filter', () => {
       ctx = { ...ctx, entity: { ...ctx.entity, numbers: [1, 2, 3, 4, 5] } };
       const result = evaluate(
-        ['filter', '@entity.numbers', ['fn', 'x', ['>', '@x', 2]]],
+        ['filter', '@entity.numbers', ['>', '@item', 2]],
         ctx
       );
       expect(result).toEqual([3, 4, 5]);
@@ -348,7 +348,7 @@ describe('SExpressionEvaluator', () => {
     it('evaluates find', () => {
       ctx = { ...ctx, entity: { ...ctx.entity, numbers: [1, 2, 3, 4, 5] } };
       const result = evaluate(
-        ['find', '@entity.numbers', ['fn', 'x', ['>', '@x', 3]]],
+        ['find', '@entity.numbers', ['>', '@item', 3]],
         ctx
       );
       expect(result).toBe(4);

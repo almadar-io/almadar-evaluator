@@ -15,49 +15,66 @@ import { isSExpr, getOperator, getArgs } from '../types/expression.js';
 type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
 /**
- * Helper to evaluate a lambda expression with bound variable(s).
+ * Evaluate an expression with @item and @index bound in context.
+ * This matches the Rust evaluator's approach for map/filter/find/some/every.
+ *
+ * Usage: ["array/map", arr, ["*", "@item", 2]]
+ *        ["array/filter", arr, [">", "@item", 3]]
  */
-function evalLambda(
+function evalWithItem(
+  expr: SExpr,
+  evaluate: EvalFn,
+  ctx: EvaluationContext,
+  item: unknown,
+  index: number
+): unknown {
+  const locals = new Map<string, unknown>();
+  locals.set('item', item);
+  locals.set('index', index);
+  const childCtx = createChildContext(ctx, locals);
+  return evaluate(expr, childCtx);
+}
+
+/**
+ * Evaluate a reducer lambda with named params bound in context.
+ * Used by array/reduce: ["fn", ["acc", "x"], body]
+ * Binds each named param to the corresponding value.
+ */
+function evalReduceLambda(
   lambdaExpr: SExpr,
   evaluate: EvalFn,
   ctx: EvaluationContext,
-  ...values: unknown[]
+  acc: unknown,
+  item: unknown
 ): unknown {
-  if (!isSExpr(lambdaExpr) || getOperator(lambdaExpr) !== 'fn') {
-    // Not a lambda, treat as expression to evaluate
-    return evaluate(lambdaExpr, ctx);
+  const locals = new Map<string, unknown>();
+
+  if (isSExpr(lambdaExpr) && getOperator(lambdaExpr) === 'fn') {
+    const fnArgs = getArgs(lambdaExpr);
+    const params = fnArgs[0];
+    const body = fnArgs[1];
+
+    if (Array.isArray(params)) {
+      const paramNames = params as string[];
+      const values = [acc, item];
+      paramNames.forEach((p, i) => {
+        const key = (p as string).startsWith('@') ? (p as string).slice(1) : (p as string);
+        locals.set(key, values[i]);
+      });
+    } else if (typeof params === 'string') {
+      const key = params.startsWith('@') ? params.slice(1) : params;
+      locals.set(key, acc);
+    }
+
+    const childCtx = createChildContext(ctx, locals);
+    return evaluate(body as SExpr, childCtx);
   }
 
-  const args = getArgs(lambdaExpr);
-  const params = args[0]; // Variable name(s)
-  const body = args[1]; // Body expression
-
-  // Create new locals map for the child context
-  const newLocals = new Map<string, unknown>();
-
-  if (Array.isArray(params)) {
-    // Multiple params: ["fn", ["a", "b"], body]
-    // This is an array of strings, NOT an S-expression
-    const paramNames = params as string[];
-    values.forEach((v, i) => {
-      if (paramNames[i]) {
-        const paramName = paramNames[i];
-        // Store without @ prefix - resolveBinding strips @ before lookup
-        const key = paramName.startsWith('@') ? paramName.slice(1) : paramName;
-        newLocals.set(key, v);
-      }
-    });
-  } else if (typeof params === 'string') {
-    // Single param: ["fn", "x", body]
-    // Store without @ prefix - resolveBinding strips @ before lookup
-    const paramName = params.startsWith('@') ? params.slice(1) : params;
-    newLocals.set(paramName, values[0]);
-  }
-
-  // Create child context with bound variable(s)
-  const childCtx = createChildContext(ctx, newLocals);
-
-  return evaluate(body, childCtx);
+  // Fallback: evaluate expression with acc/item bound as @item/@index
+  locals.set('acc', acc);
+  locals.set('item', item);
+  const childCtx = createChildContext(ctx, locals);
+  return evaluate(lambdaExpr, childCtx);
 }
 
 /**
@@ -354,7 +371,8 @@ export function evalArrayIndexOf(
 }
 
 /**
- * array/find - Find first element matching predicate
+ * array/find - Find first element matching predicate.
+ * Predicate is an expression using @item (and optionally @index).
  */
 export function evalArrayFind(
   args: SExpr[],
@@ -362,12 +380,13 @@ export function evalArrayFind(
   ctx: EvaluationContext
 ): unknown {
   const arr = evaluate(args[0], ctx) as unknown[];
-  const lambda = args[1];
-  return (arr ?? []).find((item) => evalLambda(lambda, evaluate, ctx, item));
+  const predExpr = args[1];
+  return (arr ?? []).find((item, i) => evalWithItem(predExpr, evaluate, ctx, item, i));
 }
 
 /**
- * array/findIndex - Find index of first element matching predicate (-1 if none)
+ * array/findIndex - Find index of first element matching predicate (-1 if none).
+ * Predicate is an expression using @item (and optionally @index).
  */
 export function evalArrayFindIndex(
   args: SExpr[],
@@ -375,12 +394,13 @@ export function evalArrayFindIndex(
   ctx: EvaluationContext
 ): number {
   const arr = evaluate(args[0], ctx) as unknown[];
-  const lambda = args[1];
-  return (arr ?? []).findIndex((item) => evalLambda(lambda, evaluate, ctx, item));
+  const predExpr = args[1];
+  return (arr ?? []).findIndex((item, i) => evalWithItem(predExpr, evaluate, ctx, item, i));
 }
 
 /**
- * array/filter - Keep elements matching predicate
+ * array/filter - Keep elements matching predicate.
+ * Predicate is an expression using @item (and optionally @index).
  */
 export function evalArrayFilter(
   args: SExpr[],
@@ -388,12 +408,13 @@ export function evalArrayFilter(
   ctx: EvaluationContext
 ): unknown[] {
   const arr = evaluate(args[0], ctx) as unknown[];
-  const lambda = args[1];
-  return (arr ?? []).filter((item) => evalLambda(lambda, evaluate, ctx, item));
+  const predExpr = args[1];
+  return (arr ?? []).filter((item, i) => evalWithItem(predExpr, evaluate, ctx, item, i));
 }
 
 /**
- * array/reject - Remove elements matching predicate
+ * array/reject - Remove elements matching predicate.
+ * Predicate is an expression using @item (and optionally @index).
  */
 export function evalArrayReject(
   args: SExpr[],
@@ -401,12 +422,13 @@ export function evalArrayReject(
   ctx: EvaluationContext
 ): unknown[] {
   const arr = evaluate(args[0], ctx) as unknown[];
-  const lambda = args[1];
-  return (arr ?? []).filter((item) => !evalLambda(lambda, evaluate, ctx, item));
+  const predExpr = args[1];
+  return (arr ?? []).filter((item, i) => !evalWithItem(predExpr, evaluate, ctx, item, i));
 }
 
 /**
- * array/map - Transform each element
+ * array/map - Transform each element.
+ * Mapper is an expression using @item (and optionally @index).
  */
 export function evalArrayMap(
   args: SExpr[],
@@ -414,12 +436,13 @@ export function evalArrayMap(
   ctx: EvaluationContext
 ): unknown[] {
   const arr = evaluate(args[0], ctx) as unknown[];
-  const lambda = args[1];
-  return (arr ?? []).map((item) => evalLambda(lambda, evaluate, ctx, item));
+  const mapExpr = args[1];
+  return (arr ?? []).map((item, i) => evalWithItem(mapExpr, evaluate, ctx, item, i));
 }
 
 /**
- * array/reduce - Reduce array to single value
+ * array/reduce - Reduce array to single value.
+ * Arg order matches Rust evaluator: [array, initialValue, ["fn", ["acc", "x"], body]]
  */
 export function evalArrayReduce(
   args: SExpr[],
@@ -427,16 +450,17 @@ export function evalArrayReduce(
   ctx: EvaluationContext
 ): unknown {
   const arr = evaluate(args[0], ctx) as unknown[];
-  const lambda = args[1];
-  const init = evaluate(args[2], ctx);
+  const init = evaluate(args[1], ctx);
+  const reducerExpr = args[2];
   return (arr ?? []).reduce(
-    (acc, item) => evalLambda(lambda, evaluate, ctx, acc, item),
+    (acc, item) => evalReduceLambda(reducerExpr, evaluate, ctx, acc, item),
     init
   );
 }
 
 /**
- * array/every - Check if all elements match predicate
+ * array/every - Check if all elements match predicate.
+ * Predicate is an expression using @item (and optionally @index).
  */
 export function evalArrayEvery(
   args: SExpr[],
@@ -444,12 +468,13 @@ export function evalArrayEvery(
   ctx: EvaluationContext
 ): boolean {
   const arr = evaluate(args[0], ctx) as unknown[];
-  const lambda = args[1];
-  return (arr ?? []).every((item) => Boolean(evalLambda(lambda, evaluate, ctx, item)));
+  const predExpr = args[1];
+  return (arr ?? []).every((item, i) => Boolean(evalWithItem(predExpr, evaluate, ctx, item, i)));
 }
 
 /**
- * array/some - Check if any element matches predicate
+ * array/some - Check if any element matches predicate.
+ * Predicate is an expression using @item (and optionally @index).
  */
 export function evalArraySome(
   args: SExpr[],
@@ -457,12 +482,13 @@ export function evalArraySome(
   ctx: EvaluationContext
 ): boolean {
   const arr = evaluate(args[0], ctx) as unknown[];
-  const lambda = args[1];
-  return (arr ?? []).some((item) => Boolean(evalLambda(lambda, evaluate, ctx, item)));
+  const predExpr = args[1];
+  return (arr ?? []).some((item, i) => Boolean(evalWithItem(predExpr, evaluate, ctx, item, i)));
 }
 
 /**
- * array/count - Count elements (optionally matching predicate)
+ * array/count - Count elements (optionally matching predicate).
+ * Predicate is an expression using @item (and optionally @index).
  */
 export function evalArrayCount(
   args: SExpr[],
@@ -471,8 +497,8 @@ export function evalArrayCount(
 ): number {
   const arr = evaluate(args[0], ctx) as unknown[];
   if (args.length > 1) {
-    const lambda = args[1];
-    return (arr ?? []).filter((item) => evalLambda(lambda, evaluate, ctx, item)).length;
+    const predExpr = args[1];
+    return (arr ?? []).filter((item, i) => evalWithItem(predExpr, evaluate, ctx, item, i)).length;
   }
   return arr?.length ?? 0;
 }
@@ -580,7 +606,8 @@ export function evalArrayGroupBy(
 }
 
 /**
- * array/partition - Split array by predicate into [matches, nonMatches]
+ * array/partition - Split array by predicate into [matches, nonMatches].
+ * Predicate is an expression using @item (and optionally @index).
  */
 export function evalArrayPartition(
   args: SExpr[],
@@ -588,18 +615,18 @@ export function evalArrayPartition(
   ctx: EvaluationContext
 ): [unknown[], unknown[]] {
   const arr = evaluate(args[0], ctx) as unknown[];
-  const lambda = args[1];
+  const predExpr = args[1];
 
   const matches: unknown[] = [];
   const nonMatches: unknown[] = [];
 
-  for (const item of arr ?? []) {
-    if (evalLambda(lambda, evaluate, ctx, item)) {
+  (arr ?? []).forEach((item, i) => {
+    if (evalWithItem(predExpr, evaluate, ctx, item, i)) {
       matches.push(item);
     } else {
       nonMatches.push(item);
     }
-  }
+  });
 
   return [matches, nonMatches];
 }

@@ -298,44 +298,44 @@ describe('StdLibraryEvaluator', () => {
       expect(evaluate(['array/indexOf', [1, 2, 3], 5], ctx)).toBe(-1);
     });
 
-    it('array/filter filters with lambda', () => {
+    it('array/filter filters with @item predicate', () => {
       ctx = createMinimalContext({ items: [1, 2, 3, 4, 5] }, {});
       const result = evaluate(
-        ['array/filter', '@entity.items', ['fn', 'x', ['>', '@x', 2]]],
+        ['array/filter', '@entity.items', ['>', '@item', 2]],
         ctx
       );
       expect(result).toEqual([3, 4, 5]);
     });
 
-    it('array/map transforms with lambda', () => {
+    it('array/map transforms with @item expression', () => {
       ctx = createMinimalContext({ items: [1, 2, 3] }, {});
       const result = evaluate(
-        ['array/map', '@entity.items', ['fn', 'x', ['*', '@x', 2]]],
+        ['array/map', '@entity.items', ['*', '@item', 2]],
         ctx
       );
       expect(result).toEqual([2, 4, 6]);
     });
 
-    it('array/reduce reduces with lambda', () => {
+    it('array/reduce reduces with fn — arg order [array, initial, fn]', () => {
       ctx = createMinimalContext({ items: [1, 2, 3, 4] }, {});
       const result = evaluate(
-        ['array/reduce', '@entity.items', ['fn', ['acc', 'x'], ['+', '@acc', '@x']], 0],
+        ['array/reduce', '@entity.items', 0, ['fn', ['acc', 'x'], ['+', '@acc', '@x']]],
         ctx
       );
       expect(result).toBe(10);
     });
 
-    it('array/every checks all match', () => {
+    it('array/every checks all match with @item predicate', () => {
       ctx = createMinimalContext({ items: [2, 4, 6] }, {});
       expect(
-        evaluate(['array/every', '@entity.items', ['fn', 'x', ['=', ['%', '@x', 2], 0]]], ctx)
+        evaluate(['array/every', '@entity.items', ['=', ['%', '@item', 2], 0]], ctx)
       ).toBe(true);
     });
 
-    it('array/some checks any match', () => {
+    it('array/some checks any match with @item predicate', () => {
       ctx = createMinimalContext({ items: [1, 2, 3] }, {});
       expect(
-        evaluate(['array/some', '@entity.items', ['fn', 'x', ['>', '@x', 2]]], ctx)
+        evaluate(['array/some', '@entity.items', ['>', '@item', 2]], ctx)
       ).toBe(true);
     });
 

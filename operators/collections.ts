@@ -2,6 +2,9 @@
  * Collection Operator Implementations
  *
  * Implements: map, filter, find, count, sum, first, last, nth, concat, includes, empty
+ *
+ * These short-form operators (map, filter, find) use @item/@index bindings,
+ * matching the Rust evaluator's approach.
  */
 
 import type { SExpr } from '../types/expression.js';
@@ -10,62 +13,44 @@ import { createChildContext } from '../context.js';
 
 type Evaluator = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
+function withItem(
+  expr: SExpr,
+  evaluate: Evaluator,
+  ctx: EvaluationContext,
+  item: unknown,
+  index: number
+): unknown {
+  const locals = new Map<string, unknown>();
+  locals.set('item', item);
+  locals.set('index', index);
+  return evaluate(expr, createChildContext(ctx, locals));
+}
+
 /**
- * Evaluate map: ["map", collection, ["fn", varName, body]]
+ * Evaluate map: ["map", collection, expr_using_@item]
  */
 export function evalMap(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown[] {
   const collection = toArray(evaluate(args[0], ctx));
-  const fnExpr = args[1] as SExpr[];
-
-  // Get function params and body
-  const params = fnExpr[1];
-  const body = fnExpr[2];
-  const varName = typeof params === 'string' ? params : (params as SExpr[])[0] as string;
-
-  return collection.map((item) => {
-    const locals = new Map<string, unknown>();
-    locals.set(varName, item);
-    const childCtx = createChildContext(ctx, locals);
-    return evaluate(body, childCtx);
-  });
+  const mapExpr = args[1];
+  return collection.map((item, i) => withItem(mapExpr, evaluate, ctx, item, i));
 }
 
 /**
- * Evaluate filter: ["filter", collection, ["fn", varName, predicate]]
+ * Evaluate filter: ["filter", collection, expr_using_@item]
  */
 export function evalFilter(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown[] {
   const collection = toArray(evaluate(args[0], ctx));
-  const fnExpr = args[1] as SExpr[];
-
-  const params = fnExpr[1];
-  const body = fnExpr[2];
-  const varName = typeof params === 'string' ? params : (params as SExpr[])[0] as string;
-
-  return collection.filter((item) => {
-    const locals = new Map<string, unknown>();
-    locals.set(varName, item);
-    const childCtx = createChildContext(ctx, locals);
-    return Boolean(evaluate(body, childCtx));
-  });
+  const predExpr = args[1];
+  return collection.filter((item, i) => Boolean(withItem(predExpr, evaluate, ctx, item, i)));
 }
 
 /**
- * Evaluate find: ["find", collection, ["fn", varName, predicate]]
+ * Evaluate find: ["find", collection, expr_using_@item]
  */
 export function evalFind(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
   const collection = toArray(evaluate(args[0], ctx));
-  const fnExpr = args[1] as SExpr[];
-
-  const params = fnExpr[1];
-  const body = fnExpr[2];
-  const varName = typeof params === 'string' ? params : (params as SExpr[])[0] as string;
-
-  return collection.find((item) => {
-    const locals = new Map<string, unknown>();
-    locals.set(varName, item);
-    const childCtx = createChildContext(ctx, locals);
-    return Boolean(evaluate(body, childCtx));
-  });
+  const predExpr = args[1];
+  return collection.find((item, i) => Boolean(withItem(predExpr, evaluate, ctx, item, i)));
 }
 
 /**
@@ -77,27 +62,22 @@ export function evalCount(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCon
 }
 
 /**
- * Evaluate sum: ["sum", collection] or ["sum", collection, ["fn", varName, mapper]]
+ * Evaluate sum: ["sum", collection] or ["sum", collection, mapExpr_using_@item]
  */
 export function evalSum(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): number {
   const collection = toArray(evaluate(args[0], ctx));
 
   if (args.length === 1) {
-    // Direct sum
     return collection.reduce((sum: number, item) => sum + toNumber(item), 0);
   }
 
-  // Sum with mapper function
-  const fnExpr = args[1] as SExpr[];
-  const params = fnExpr[1];
-  const body = fnExpr[2];
-  const varName = typeof params === 'string' ? params : (params as SExpr[])[0] as string;
-
-  return collection.reduce((sum: number, item) => {
+  const mapExpr = args[1];
+  return collection.reduce((sum: number, item, i) => {
     const locals = new Map<string, unknown>();
-    locals.set(varName, item);
+    locals.set('item', item);
+    locals.set('index', i);
     const childCtx = createChildContext(ctx, locals);
-    return sum + toNumber(evaluate(body, childCtx));
+    return sum + toNumber(evaluate(mapExpr, childCtx));
   }, 0);
 }
 
