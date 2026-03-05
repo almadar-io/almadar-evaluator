@@ -200,6 +200,33 @@ export function evalCallService(args: SExpr[], evaluate: Evaluator, ctx: Evaluat
 }
 
 /**
+ * Recursively evaluate nested s-expressions within an object.
+ * This handles computed props like { label: ["str/concat", "Score: ", "@entity.score"] }
+ */
+function evaluateNestedProps(
+  obj: Record<string, unknown>,
+  evaluate: Evaluator,
+  ctx: EvaluationContext
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  
+  for (const [key, value] of Object.entries(obj)) {
+    if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
+      // This looks like an s-expression, evaluate it
+      result[key] = evaluate(value as SExpr, ctx);
+    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      // Nested object, recurse
+      result[key] = evaluateNestedProps(value as Record<string, unknown>, evaluate, ctx);
+    } else {
+      // Primitive value or plain array, keep as-is
+      result[key] = value;
+    }
+  }
+  
+  return result;
+}
+
+/**
  * Evaluate render-ui:
  * - ["render-ui", slot, pattern]
  * - ["render-ui", slot, pattern, props]
@@ -209,7 +236,7 @@ export function evalCallService(args: SExpr[], evaluate: Evaluator, ctx: Evaluat
 export function evalRenderUI(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): void {
   const slot = args[0] as string;
   const pattern = evaluate(args[1], ctx);
-  const props = args.length > 2 ? (evaluate(args[2], ctx) as Record<string, unknown>) : undefined;
+  const rawProps = args.length > 2 ? (args[2] as Record<string, unknown>) : undefined;
   const priority = args.length > 3 ? (evaluate(args[3], ctx) as number) : undefined;
 
   if (!ctx.renderUI) {
@@ -222,6 +249,9 @@ export function evalRenderUI(args: SExpr[], evaluate: Evaluator, ctx: Evaluation
     ctx.renderUI(slot, { type: 'clear' }, undefined, priority);
     return;
   }
+
+  // Recursively evaluate nested s-expressions in props
+  const props = rawProps ? evaluateNestedProps(rawProps, evaluate, ctx) : undefined;
 
   ctx.renderUI(slot, pattern, props, priority);
 }
