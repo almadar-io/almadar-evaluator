@@ -11,18 +11,24 @@ import { createChildContext } from '../context.js';
 type Evaluator = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
 /**
- * Evaluate let binding: ["let", [[name, value], ...], body]
- * Creates local bindings for use in body.
+ * Evaluate let binding.
+ * Supports two formats:
+ *   - Array of pairs: ["let", [["x", 10], ["y", 20]], body]
+ *   - Object style:   ["let", {"x": 10, "y": 20}, body]
  */
 export function evalLet(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
-  const bindings = args[0] as SExpr[][];
+  const rawBindings = args[0];
   const body = args[1];
+
+  // Build binding pairs from either array-of-pairs or object format
+  const bindingPairs: Array<[string, SExpr]> = Array.isArray(rawBindings)
+    ? (rawBindings as SExpr[][]).map(b => [b[0] as string, b[1]])
+    : Object.entries(rawBindings as Record<string, SExpr>);
 
   // Evaluate bindings and create new context
   const locals = new Map<string, unknown>();
-  for (const binding of bindings) {
-    const name = binding[0] as string;
-    const value = evaluate(binding[1], ctx);
+  for (const [name, valueExpr] of bindingPairs) {
+    const value = evaluate(valueExpr, ctx);
     locals.set(name, value);
   }
 
