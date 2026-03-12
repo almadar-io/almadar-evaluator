@@ -537,4 +537,473 @@ describe('SExpressionEvaluator', () => {
       ]);
     });
   });
+
+  // ============================================================================
+  // fn / lambda Operator
+  // ============================================================================
+
+  describe('fn / lambda', () => {
+    it('fn returns a function', () => {
+      const result = evaluate(['fn', 'x', ['+', '@x', 1]], ctx);
+      expect(typeof result).toBe('function');
+    });
+
+    it('lambda is an alias for fn', () => {
+      const result = evaluate(['lambda', 'x', ['*', '@x', 2]], ctx);
+      expect(typeof result).toBe('function');
+    });
+
+    it('fn with single param works with array/map', () => {
+      const result = evaluate(
+        ['array/map', [1, 2, 3], ['fn', 'x', ['*', '@x', 2]]],
+        ctx
+      );
+      expect(result).toEqual([2, 4, 6]);
+    });
+
+    it('fn with single param works with array/filter', () => {
+      const result = evaluate(
+        ['array/filter', [1, 2, 3, 4, 5], ['fn', 'x', ['>', '@x', 3]]],
+        ctx
+      );
+      expect(result).toEqual([4, 5]);
+    });
+
+    it('fn with single param works with array/find', () => {
+      const result = evaluate(
+        ['array/find', [1, 2, 3, 4], ['fn', 'x', ['>', '@x', 2]]],
+        ctx
+      );
+      expect(result).toBe(3);
+    });
+
+    it('fn with multi params works with array/reduce', () => {
+      const result = evaluate(
+        ['array/reduce', [1, 2, 3, 4], 0, ['fn', ['acc', 'x'], ['+', '@acc', '@x']]],
+        ctx
+      );
+      expect(result).toBe(10);
+    });
+
+    it('fn with array/every', () => {
+      const result = evaluate(
+        ['array/every', [2, 4, 6], ['fn', 'x', ['=', ['%', '@x', 2], 0]]],
+        ctx
+      );
+      expect(result).toBe(true);
+    });
+
+    it('fn with array/some', () => {
+      const result = evaluate(
+        ['array/some', [1, 3, 4], ['fn', 'x', ['=', ['%', '@x', 2], 0]]],
+        ctx
+      );
+      expect(result).toBe(true);
+    });
+
+    it('fn with object/filter (two params: key, value)', () => {
+      const result = evaluate(
+        ['object/filter', { a: 1, b: 0, c: 3 }, ['fn', ['k', 'v'], ['>', '@v', 0]]],
+        ctx
+      );
+      expect(result).toEqual({ a: 1, c: 3 });
+    });
+
+    it('fn with object/mapValues', () => {
+      const result = evaluate(
+        ['object/mapValues', { a: 1, b: 2 }, ['fn', 'v', ['*', '@v', 10]]],
+        ctx
+      );
+      expect(result).toEqual({ a: 10, b: 20 });
+    });
+
+    it('nested fn (fn returning fn result)', () => {
+      // Map over array, filter result
+      const result = evaluate(
+        ['array/filter',
+          ['array/map', [1, 2, 3, 4, 5], ['fn', 'x', ['*', '@x', 2]]],
+          ['fn', 'x', ['>', '@x', 5]]
+        ],
+        ctx
+      );
+      expect(result).toEqual([6, 8, 10]);
+    });
+
+    it('fn inside if conditional', () => {
+      const result = evaluate(
+        ['if', true,
+          ['array/map', [1, 2, 3], ['fn', 'x', ['+', '@x', 10]]],
+          [0]
+        ],
+        ctx
+      );
+      expect(result).toEqual([11, 12, 13]);
+    });
+
+    it('fn inside let binding', () => {
+      const result = evaluate(
+        ['let', [['data', [1, 2, 3, 4, 5]]],
+          ['array/filter', '@data', ['fn', 'x', ['>', '@x', 3]]]
+        ],
+        ctx
+      );
+      expect(result).toEqual([4, 5]);
+    });
+
+    it('fn inside do block', () => {
+      const result = evaluate(
+        ['do',
+          ['let', [['unused', 0]], 0],
+          ['array/map', [10, 20, 30], ['fn', 'x', ['/', '@x', 10]]]
+        ],
+        ctx
+      );
+      expect(result).toEqual([1, 2, 3]);
+    });
+
+    it('complex: reduce with multi-param fn and nested arithmetic', () => {
+      // Sum of squares: reduce([1,2,3,4], 0, fn(acc,x) => acc + x*x)
+      const result = evaluate(
+        ['array/reduce', [1, 2, 3, 4], 0,
+          ['fn', ['acc', 'x'], ['+', '@acc', ['*', '@x', '@x']]]
+        ],
+        ctx
+      );
+      expect(result).toBe(30); // 1+4+9+16
+    });
+  });
+
+  // ============================================================================
+  // Complex / Stress Tests
+  // ============================================================================
+
+  describe('complex expressions (stress tests)', () => {
+    // --- Deep nesting ---
+
+    it('deeply nested if/let/do chain', () => {
+      // if(true, let(a=10, do(let(b=20, +(a,b)))), 0)
+      const result = evaluate(
+        ['if', true,
+          ['let', [['a', 10]],
+            ['do',
+              ['let', [['b', 20]], ['+', '@a', '@b']]
+            ]
+          ],
+          0
+        ],
+        ctx
+      );
+      expect(result).toBe(30);
+    });
+
+    it('5-level nested arithmetic', () => {
+      // ((((1 + 2) * 3) - 4) / 5) + 6 = ((3*3 - 4) / 5) + 6 = (9-4)/5 + 6 = 1 + 6 = 7
+      const result = evaluate(
+        ['+', ['/', ['-', ['*', ['+', 1, 2], 3], 4], 5], 6],
+        ctx
+      );
+      expect(result).toBe(7);
+    });
+
+    it('nested conditionals with bindings', () => {
+      // if(health > 50, if(health > 80, "strong", "medium"), "weak")
+      const result = evaluate(
+        ['if', ['>', '@entity.health', 50],
+          ['if', ['>', '@entity.health', 80], 'strong', 'medium'],
+          'weak'
+        ],
+        ctx
+      );
+      expect(result).toBe('strong'); // health=100
+    });
+
+    it('triple-nested let bindings with shadowing', () => {
+      const result = evaluate(
+        ['let', [['x', 1]],
+          ['let', [['y', ['+', '@x', 10]]],
+            ['let', [['x', 100]], // shadow outer x
+              ['+', '@x', '@y']   // x=100, y=11
+            ]
+          ]
+        ],
+        ctx
+      );
+      expect(result).toBe(111);
+    });
+
+    // --- Complex collection pipelines ---
+
+    it('map then filter then reduce pipeline', () => {
+      // [1..5] -> map(x*x) -> filter(>5) -> reduce(+, 0)
+      // squares: [1,4,9,16,25] -> filter: [9,16,25] -> sum: 50
+      const result = evaluate(
+        ['array/reduce',
+          ['array/filter',
+            ['array/map', [1, 2, 3, 4, 5], ['fn', 'x', ['*', '@x', '@x']]],
+            ['fn', 'x', ['>', '@x', 5]]
+          ],
+          0,
+          ['fn', ['acc', 'x'], ['+', '@acc', '@x']]
+        ],
+        ctx
+      );
+      expect(result).toBe(50);
+    });
+
+    it('nested map producing objects then filtering', () => {
+      // Map numbers to {val: n, doubled: n*2}, filter where doubled > 5
+      const mapped = evaluate(
+        ['array/map', [1, 2, 3, 4],
+          ['fn', 'x', ['object/merge',
+            ['object/set', {}, 'val', '@x'],
+            ['object/set', {}, 'doubled', ['*', '@x', 2]]
+          ]]
+        ],
+        ctx
+      );
+      expect(mapped).toEqual([
+        { val: 1, doubled: 2 },
+        { val: 2, doubled: 4 },
+        { val: 3, doubled: 6 },
+        { val: 4, doubled: 8 },
+      ]);
+    });
+
+    it('groupBy then mapValues', () => {
+      const data = [
+        { name: 'a', type: 'x', score: 10 },
+        { name: 'b', type: 'y', score: 20 },
+        { name: 'c', type: 'x', score: 30 },
+      ];
+      // Group by type, then map each group to its length
+      const grouped = evaluate(['array/groupBy', data, 'type'], ctx);
+      expect(grouped).toEqual({
+        x: [{ name: 'a', type: 'x', score: 10 }, { name: 'c', type: 'x', score: 30 }],
+        y: [{ name: 'b', type: 'y', score: 20 }],
+      });
+    });
+
+    // --- Conditional logic with collections ---
+
+    it('if inside map lambda', () => {
+      // Map [1,2,3,4,5] -> if x>3 then "big" else "small"
+      const result = evaluate(
+        ['array/map', [1, 2, 3, 4, 5],
+          ['fn', 'x', ['if', ['>', '@x', 3], 'big', 'small']]
+        ],
+        ctx
+      );
+      expect(result).toEqual(['small', 'small', 'small', 'big', 'big']);
+    });
+
+    it('when inside do block', () => {
+      const calls: string[] = [];
+      const effectCtx = createEffectContext(ctx, {
+        mutateEntity: (changes) => calls.push(`set:${JSON.stringify(changes)}`),
+        emit: (event) => calls.push(`emit:${event}`),
+      });
+
+      evaluate(
+        ['do',
+          ['when', ['>', '@entity.health', 50], ['emit', 'HEALTHY']],
+          ['when', ['<', '@entity.health', 50], ['emit', 'WOUNDED']],
+          42
+        ],
+        effectCtx
+      );
+
+      expect(calls).toEqual(['emit:HEALTHY']);
+    });
+
+    // --- String + collection composition ---
+
+    it('map objects to formatted strings', () => {
+      // Build "name:score" strings from data
+      const result = evaluate(
+        ['array/map',
+          [{ name: 'Alice', score: 95 }, { name: 'Bob', score: 87 }],
+          ['fn', 'x',
+            ['str/concat',
+              ['object/get', '@x', 'name'],
+              ':',
+              ['to-string', ['object/get', '@x', 'score']]
+            ]
+          ]
+        ],
+        ctx
+      );
+      expect(result).toEqual(['Alice:95', 'Bob:87']);
+    });
+
+    it('filter + count pattern', () => {
+      const result = evaluate(
+        ['array/count',
+          ['array/filter', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            ['fn', 'x', ['=', ['%', '@x', 2], 0]]
+          ]
+        ],
+        ctx
+      );
+      expect(result).toBe(5); // 5 even numbers
+    });
+
+    // --- Mixed operator types ---
+
+    it('math + comparison + logic + if + let composition', () => {
+      // let(distance = sqrt(x*x + y*y), if(distance > 15, "far", "near"))
+      const result = evaluate(
+        ['let', [['distance', ['math/sqrt', ['+', ['*', '@entity.x', '@entity.x'], ['*', '@entity.y', '@entity.y']]]]],
+          ['if', ['>', '@distance', 15], 'far', 'near']
+        ],
+        ctx
+      );
+      // distance = sqrt(100+400) = sqrt(500) = ~22.36
+      expect(result).toBe('far');
+    });
+
+    it('clamp + lerp + round composition', () => {
+      const result = evaluate(
+        ['math/round', ['math/lerp', 0, 100, ['math/clamp', 0.75, 0, 1]]],
+        ctx
+      );
+      expect(result).toBe(75);
+    });
+
+    // --- Edge cases ---
+
+    it('empty array operations', () => {
+      expect(evaluate(['array/map', [], ['fn', 'x', ['*', '@x', 2]]], ctx)).toEqual([]);
+      expect(evaluate(['array/filter', [], ['fn', 'x', true]], ctx)).toEqual([]);
+      expect(evaluate(['array/reduce', [], 0, ['fn', ['a', 'x'], ['+', '@a', '@x']]], ctx)).toBe(0);
+      expect(evaluate(['array/find', [], ['fn', 'x', true]], ctx)).toBeUndefined();
+    });
+
+    it('single element array operations', () => {
+      expect(evaluate(['array/map', [42], ['fn', 'x', ['*', '@x', 2]]], ctx)).toEqual([84]);
+      expect(evaluate(['array/filter', [42], ['fn', 'x', ['>', '@x', 100]]], ctx)).toEqual([]);
+      expect(evaluate(['array/reduce', [42], 0, ['fn', ['a', 'x'], ['+', '@a', '@x']]], ctx)).toBe(42);
+    });
+
+    it('nested object/get chains', () => {
+      const data = { user: { profile: { name: 'Test' } } };
+      const result = evaluate(
+        ['object/get', ['object/get', ['object/get', data, 'user'], 'profile'], 'name'],
+        ctx
+      );
+      expect(result).toBe('Test');
+    });
+
+    it('boolean logic chains', () => {
+      // (health > 0) AND ((x > 0) OR (y > 0)) AND NOT(health = 0)
+      const result = evaluate(
+        ['and',
+          ['>', '@entity.health', 0],
+          ['or', ['>', '@entity.x', 0], ['>', '@entity.y', 0]],
+          ['not', ['=', '@entity.health', 0]]
+        ],
+        ctx
+      );
+      expect(result).toBe(true);
+    });
+
+    it('do block returns last expression', () => {
+      const result = evaluate(
+        ['do',
+          ['+', 1, 2],       // 3 (ignored)
+          ['*', 3, 4],       // 12 (ignored)
+          ['-', 100, 1]      // 99 (returned)
+        ],
+        ctx
+      );
+      expect(result).toBe(99);
+    });
+
+    it('let with computed bindings referencing earlier bindings', () => {
+      // let(a=5, let(b=a*2, let(c=a+b, c)))
+      // a=5, b=10, c=15
+      const result = evaluate(
+        ['let', [['a', 5]],
+          ['let', [['b', ['*', '@a', 2]]],
+            ['let', [['c', ['+', '@a', '@b']]],
+              '@c'
+            ]
+          ]
+        ],
+        ctx
+      );
+      expect(result).toBe(15);
+    });
+
+    // --- Validate + conditional ---
+
+    it('validate inside conditional logic', () => {
+      const result = evaluate(
+        ['if',
+          ['and',
+            ['validate/email', 'user@example.com'],
+            ['validate/minLength', 'user@example.com', 5]
+          ],
+          'valid',
+          'invalid'
+        ],
+        ctx
+      );
+      expect(result).toBe('valid');
+    });
+
+    // --- Time expressions ---
+
+    it('time comparison chain', () => {
+      const now = evaluate(['time/now'], ctx) as string;
+      const isPast = evaluate(['time/isPast', ['time/subtract', now, 1, 'day']], ctx);
+      const isFuture = evaluate(['time/isFuture', ['time/add', now, 1, 'day']], ctx);
+      expect(isPast).toBe(true);
+      expect(isFuture).toBe(true);
+    });
+
+    // --- Fibonacci via reduce ---
+
+    it('fibonacci-like via reduce', () => {
+      // Use reduce to generate fibonacci: reduce over range, accumulate [a,b] pairs
+      // This tests multi-step reduce with array accumulator
+      const result = evaluate(
+        ['array/reduce',
+          [1, 2, 3, 4, 5, 6], // 6 iterations
+          [0, 1],              // initial: [fib(0), fib(1)]
+          ['fn', ['pair', 'i'],
+            ['let', [
+              ['a', ['array/first', '@pair']],
+              ['b', ['array/last', '@pair']]
+            ],
+              ['array/append',
+                ['array/slice', '@pair', 1],  // drop first: [b]
+                ['+', '@a', '@b']             // append a+b
+              ]
+            ]
+          ]
+        ],
+        ctx
+      );
+      // After 6 iterations starting from [0,1]:
+      // [1,1] -> [1,2] -> [2,3] -> [3,5] -> [5,8] -> [8,13]
+      expect(result).toEqual([8, 13]);
+    });
+
+    // --- Object construction via reduce ---
+
+    it('build object from array via reduce', () => {
+      // reduce(['a','b','c'], {}, fn(acc,x) => object/set(acc, x, str/upper(x)))
+      const result = evaluate(
+        ['array/reduce',
+          ['str/split', 'a,b,c', ','],
+          {},
+          ['fn', ['acc', 'x'],
+            ['object/set', '@acc', '@x', ['str/upper', '@x']]
+          ]
+        ],
+        ctx
+      );
+      expect(result).toEqual({ a: 'A', b: 'B', c: 'C' });
+    });
+  });
 });

@@ -18,8 +18,13 @@ type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
  * Evaluate an expression with @item and @index bound in context.
  * This matches the Rust evaluator's approach for map/filter/find/some/every.
  *
- * Usage: ["array/map", arr, ["*", "@item", 2]]
- *        ["array/filter", arr, [">", "@item", 3]]
+ * Supports two lambda styles:
+ *   - Implicit: ["array/map", arr, ["*", "@item", 2]]  (uses @item/@index)
+ *   - Explicit: ["array/map", arr, ["fn", "x", ["*", "@x", 2]]]  (named param)
+ *
+ * When the expression is ["fn", param, body], the param name is bound to the
+ * item value and the body is evaluated directly (avoiding dispatch which would
+ * return a closure instead of applying it).
  */
 function evalWithItem(
   expr: SExpr,
@@ -31,6 +36,33 @@ function evalWithItem(
   const locals = new Map<string, unknown>();
   locals.set('item', item);
   locals.set('index', index);
+
+  // Handle fn/lambda structurally: bind named param(s) to item/index
+  if (isSExpr(expr)) {
+    const op = getOperator(expr);
+    if (op === 'fn' || op === 'lambda') {
+      const fnArgs = getArgs(expr);
+      const params = fnArgs[0];
+      const body = fnArgs[1];
+
+      if (typeof params === 'string') {
+        const key = params.startsWith('@') ? params.slice(1) : params;
+        locals.set(key, item);
+      } else if (Array.isArray(params)) {
+        const paramNames = params as string[];
+        const values = [item, index];
+        for (let i = 0; i < paramNames.length; i++) {
+          const p = paramNames[i] as string;
+          const key = p.startsWith('@') ? p.slice(1) : p;
+          locals.set(key, values[i]);
+        }
+      }
+
+      const childCtx = createChildContext(ctx, locals);
+      return evaluate(body as SExpr, childCtx);
+    }
+  }
+
   const childCtx = createChildContext(ctx, locals);
   return evaluate(expr, childCtx);
 }

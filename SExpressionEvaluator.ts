@@ -40,6 +40,7 @@ import {
   evalLet,
   evalDo,
   evalWhen,
+  evalFn,
   evalMap,
   evalFilter,
   evalFind,
@@ -259,6 +260,9 @@ export class SExpressionEvaluator {
         return evalDo(args, evaluate, ctx);
       case 'when':
         return evalWhen(args, evaluate, ctx);
+      case 'fn':
+      case 'lambda':
+        return evalFn(args, evaluate, ctx);
 
       // Collections
       case 'map':
