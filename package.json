@@ -1,6 +1,6 @@
 {
   "name": "@almadar/evaluator",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "S-expression evaluator for Almadar",
   "type": "module",
   "main": "./dist/index.js",
@@ -8,12 +8,14 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     },
     "./operators": {
+      "types": "./dist/operators/index.d.ts",
       "import": "./dist/operators/index.js",
-      "types": "./dist/operators/index.d.ts"
+      "require": "./dist/operators/index.js"
     }
   },
   "files": [
