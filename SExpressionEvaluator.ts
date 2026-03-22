@@ -76,6 +76,7 @@ import * as stdTime from './std/time.js';
 import * as stdFormat from './std/format.js';
 import * as stdAsync from './std/async.js';
 import * as stdProb from './std/prob.js';
+import * as stdOs from './std/os.js';
 
 /**
  * JIT compilation cache for hot paths.
@@ -735,6 +736,18 @@ export class SExpressionEvaluator {
         return stdProb.evalProbPercentile(args, evaluate, ctx);
       case 'prob/credible-interval':
         return stdProb.evalProbCredibleInterval(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: os/*
+      // ===============================
+      case 'os/watch-files': stdOs.evalOsWatchFiles(args, evaluate, ctx); return undefined;
+      case 'os/watch-process': stdOs.evalOsWatchProcess(args, evaluate, ctx); return undefined;
+      case 'os/watch-port': stdOs.evalOsWatchPort(args, evaluate, ctx); return undefined;
+      case 'os/watch-http': stdOs.evalOsWatchHttp(args, evaluate, ctx); return undefined;
+      case 'os/watch-cron': stdOs.evalOsWatchCron(args, evaluate, ctx); return undefined;
+      case 'os/watch-signal': stdOs.evalOsWatchSignal(args, evaluate, ctx); return undefined;
+      case 'os/watch-env': stdOs.evalOsWatchEnv(args, evaluate, ctx); return undefined;
+      case 'os/debounce': stdOs.evalOsDebounce(args, evaluate, ctx); return undefined;
 
       default:
         console.warn(`Unknown operator: ${op}`);

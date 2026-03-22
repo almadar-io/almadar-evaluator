@@ -227,3 +227,6 @@ export {
   evalProbPercentile,
   evalProbCredibleInterval,
 } from './prob.js';
+
+// OS operators
+export * from './os.js';
