@@ -18,7 +18,7 @@ function registerTrigger(
   type: string,
   config: Record<string, unknown>,
 ): void {
-  const bridge = (ctx as Record<string, unknown>).registerOsTrigger as
+  const bridge = (ctx as unknown as Record<string, unknown>).registerOsTrigger as
     | ((type: string, config: Record<string, unknown>) => void)
     | undefined;
   if (bridge) {
