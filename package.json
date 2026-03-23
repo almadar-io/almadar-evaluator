@@ -51,7 +51,7 @@
     "url": "https://github.com/almadar-io/almadar-evaluator.git",
     "directory": "docs/packages/evaluator"
   },
-  "license": "MIT",
+  "license": "BSL-1.1",
   "keywords": [
     "almadar",
     "evaluator",
