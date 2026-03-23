@@ -100,6 +100,9 @@ export interface EvaluationContext {
 
   /** Render UI to a slot */
   renderUI?: (slot: string, pattern: unknown, props?: Record<string, unknown>, priority?: number) => void;
+
+  /** Register an OS trigger (server-side only) */
+  registerOsTrigger?: (type: string, config: Record<string, unknown>) => void;
 }
 
 /**

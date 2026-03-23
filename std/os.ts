@@ -18,12 +18,7 @@ function registerTrigger(
   type: string,
   config: Record<string, unknown>,
 ): void {
-  const bridge = (ctx as unknown as Record<string, unknown>).registerOsTrigger as
-    | ((type: string, config: Record<string, unknown>) => void)
-    | undefined;
-  if (bridge) {
-    bridge(type, config);
-  }
+  ctx.registerOsTrigger?.(type, config);
 }
 
 export function evalOsWatchFiles(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): void {
