@@ -154,7 +154,8 @@ export function evalArrayLast(
   ctx: EvaluationContext
 ): unknown {
   const arr = evaluate(args[0], ctx) as unknown[];
-  return arr?.[arr.length - 1];
+  if (!Array.isArray(arr) || arr.length === 0) return undefined;
+  return arr[arr.length - 1];
 }
 
 /**
