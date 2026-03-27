@@ -327,6 +327,88 @@ export function evalDecrement(args: SExpr[], evaluate: Evaluator, ctx: Evaluatio
   ctx.mutateEntity({ [fieldPath]: newValue });
 }
 
+// ── Resource operators (ref/deref/swap!/watch/atomic) ──
+
+/**
+ * Evaluate ref: ["ref", "EntityType"] or ["ref", "EntityType", { filter, include }]
+ * Server-side: queries entity data. Client-side: subscribes to EntityStore.
+ */
+export function evalRef(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+  const entityType = args[0] as string;
+  if (ctx.effectHandlers?.ref) {
+    return ctx.effectHandlers.ref(entityType, args.length > 1 ? evaluate(args[1], ctx) : undefined);
+  }
+  // Fallback: delegate to fetch handler
+  if (ctx.effectHandlers?.fetch) {
+    return ctx.effectHandlers.fetch(entityType, args.length > 1 ? evaluate(args[1], ctx) : undefined);
+  }
+  return undefined;
+}
+
+/**
+ * Evaluate deref: ["deref", "EntityType"] or ["deref", "EntityType", idExpr]
+ * Pure snapshot read. Returns current entity data from store.
+ */
+export function evalDeref(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+  const entityType = args[0] as string;
+  const id = args.length > 1 ? evaluate(args[1], ctx) : undefined;
+  if (ctx.effectHandlers?.deref) {
+    return ctx.effectHandlers.deref(entityType, id);
+  }
+  // Fallback: read from entity context
+  if (id && ctx.effectHandlers?.fetch) {
+    return ctx.effectHandlers.fetch(entityType, id);
+  }
+  // Return entity data from context if available
+  return (ctx.entity as Record<string, unknown>)?.[entityType] ?? [];
+}
+
+/**
+ * Evaluate swap!: ["swap!", "EntityType", idExpr, transformExpr]
+ * Atomic read-modify-write with CAS retry.
+ */
+export function evalSwap(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+  const entityType = args[0] as string;
+  const id = evaluate(args[1], ctx);
+  const transformExpr = args[2];
+  if (ctx.effectHandlers?.swap) {
+    return ctx.effectHandlers.swap(entityType, id, transformExpr, evaluate, ctx);
+  }
+  console.warn('No swap handler in context');
+  return undefined;
+}
+
+/**
+ * Evaluate watch: ["watch", "EntityType", [effect1, effect2, ...]]
+ * Client-only. Registers a callback on the EntityStore.
+ */
+export function evalWatch(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): void {
+  const entityType = args[0] as string;
+  const effects = args[1] as SExpr[];
+  if (ctx.effectHandlers?.watch) {
+    ctx.effectHandlers.watch(entityType, effects, evaluate, ctx);
+  }
+  // Server-side: no-op (watch is client-only)
+}
+
+/**
+ * Evaluate atomic: ["atomic", [effect1, effect2, ...]]
+ * Groups effects into a transaction. All succeed or all roll back.
+ */
+export function evalAtomic(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+  const effects = args[0] as SExpr[];
+  if (ctx.effectHandlers?.atomic) {
+    return ctx.effectHandlers.atomic(effects, evaluate, ctx);
+  }
+  // Fallback: execute sequentially (no transaction guarantees)
+  if (Array.isArray(effects)) {
+    for (const eff of effects) {
+      evaluate(eff, ctx);
+    }
+  }
+  return undefined;
+}
+
 /**
  * Convert a value to a number.
  */

@@ -64,6 +64,11 @@ import {
   evalDespawn,
   evalCallService,
   evalRenderUI,
+  evalRef,
+  evalDeref,
+  evalSwap,
+  evalWatch,
+  evalAtomic,
 } from './operators/index.js';
 
 // Import std library evaluators
@@ -326,6 +331,19 @@ export class SExpressionEvaluator {
       case 'render-ui':
         evalRenderUI(args, evaluate, ctx);
         return undefined;
+
+      // Resource operators
+      case 'ref':
+        return evalRef(args, evaluate, ctx);
+      case 'deref':
+        return evalDeref(args, evaluate, ctx);
+      case 'swap!':
+        return evalSwap(args, evaluate, ctx);
+      case 'watch':
+        evalWatch(args, evaluate, ctx);
+        return undefined;
+      case 'atomic':
+        return evalAtomic(args, evaluate, ctx);
 
       // ===============================
       // Standard Library: math/*

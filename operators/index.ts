@@ -66,4 +66,9 @@ export {
   evalDespawn,
   evalCallService,
   evalRenderUI,
+  evalRef,
+  evalDeref,
+  evalSwap,
+  evalWatch,
+  evalAtomic,
 } from './effects.js';

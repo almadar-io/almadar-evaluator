@@ -103,6 +103,20 @@ export interface EvaluationContext {
 
   /** Register an OS trigger (server-side only) */
   registerOsTrigger?: (type: string, config: Record<string, unknown>) => void;
+
+  // ============================================================================
+  // Resource Operators (ref/deref/swap!/watch/atomic)
+  // ============================================================================
+
+  /** Effect handlers for resource operators (grouped to avoid top-level pollution) */
+  effectHandlers?: {
+    ref?: (entityType: string, options?: unknown) => unknown;
+    deref?: (entityType: string, id?: unknown) => unknown;
+    swap?: (entityType: string, id: unknown, transformExpr: unknown, evaluate: unknown, ctx: unknown) => unknown;
+    watch?: (entityType: string, effects: unknown[], evaluate: unknown, ctx: unknown) => void;
+    atomic?: (effects: unknown[], evaluate: unknown, ctx: unknown) => unknown;
+    fetch?: (entityType: string, options?: unknown) => unknown;
+  };
 }
 
 /**
