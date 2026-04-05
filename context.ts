@@ -7,6 +7,8 @@
  * @packageDocumentation
  */
 
+import type { AgentContext } from '@almadar/core';
+
 /**
  * User context for @user bindings (role-based UI).
  */
@@ -69,6 +71,9 @@ export interface EvaluationContext {
    * Set by prob/seed.
    */
   _probSeed?: { state: number };
+
+  /** Agent context for agent/* operators (memory, LLM, tools, session) */
+  agent?: AgentContext;
 
   // ============================================================================
   // Effect Handlers (for executing side effects)

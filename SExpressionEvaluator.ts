@@ -82,6 +82,7 @@ import * as stdFormat from './std/format.js';
 import * as stdAsync from './std/async.js';
 import * as stdProb from './std/prob.js';
 import * as stdOs from './std/os.js';
+import * as stdAgent from './std/agent.js';
 
 /**
  * JIT compilation cache for hot paths.
@@ -766,6 +767,43 @@ export class SExpressionEvaluator {
       case 'os/watch-signal': stdOs.evalOsWatchSignal(args, evaluate, ctx); return undefined;
       case 'os/watch-env': stdOs.evalOsWatchEnv(args, evaluate, ctx); return undefined;
       case 'os/debounce': stdOs.evalOsDebounce(args, evaluate, ctx); return undefined;
+
+      // ===============================
+      // Standard Library: agent/*
+      // ===============================
+      // Pure (memory)
+      case 'agent/recall':           return stdAgent.evalAgentRecall(args, evaluate, ctx);
+      case 'agent/memories':         return stdAgent.evalAgentMemories(args, evaluate, ctx);
+      case 'agent/memory-strength':  return stdAgent.evalAgentMemoryStrength(args, evaluate, ctx);
+      case 'agent/is-pinned':        return stdAgent.evalAgentIsPinned(args, evaluate, ctx);
+      // Pure (LLM)
+      case 'agent/provider':         return stdAgent.evalAgentProvider(args, evaluate, ctx);
+      case 'agent/model':            return stdAgent.evalAgentModel(args, evaluate, ctx);
+      // Pure (tools)
+      case 'agent/tools':            return stdAgent.evalAgentTools(args, evaluate, ctx);
+      // Pure (context)
+      case 'agent/token-count':      return stdAgent.evalAgentTokenCount(args, evaluate, ctx);
+      case 'agent/context-usage':    return stdAgent.evalAgentContextUsage(args, evaluate, ctx);
+      // Pure (session)
+      case 'agent/session-id':       return stdAgent.evalAgentSessionId(args, evaluate, ctx);
+      // Effects (memory)
+      case 'agent/memorize':         return stdAgent.evalAgentMemorize(args, evaluate, ctx);
+      case 'agent/forget':           return stdAgent.evalAgentForget(args, evaluate, ctx);
+      case 'agent/pin':              return stdAgent.evalAgentPin(args, evaluate, ctx);
+      case 'agent/reinforce':        return stdAgent.evalAgentReinforce(args, evaluate, ctx);
+      case 'agent/decay':            return stdAgent.evalAgentDecay(args, evaluate, ctx);
+      // Effects (LLM)
+      case 'agent/generate':         return stdAgent.evalAgentGenerate(args, evaluate, ctx);
+      case 'agent/switch-provider':  return stdAgent.evalAgentSwitchProvider(args, evaluate, ctx);
+      // Effects (tools)
+      case 'agent/invoke':           return stdAgent.evalAgentInvoke(args, evaluate, ctx);
+      // Effects (context)
+      case 'agent/compact':          return stdAgent.evalAgentCompact(args, evaluate, ctx);
+      // Effects (session)
+      case 'agent/fork':             return stdAgent.evalAgentFork(args, evaluate, ctx);
+      case 'agent/label':            return stdAgent.evalAgentLabel(args, evaluate, ctx);
+      // Effects (search)
+      case 'agent/search-code':      return stdAgent.evalAgentSearchCode(args, evaluate, ctx);
 
       default:
         console.warn(`Unknown operator: ${op}`);

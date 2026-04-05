@@ -230,3 +230,6 @@ export {
 
 // OS operators
 export * from './os.js';
+
+// Agent operators
+export * from './agent.js';
