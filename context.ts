@@ -183,6 +183,17 @@ export function createChildContext(
  * @param ctx - Evaluation context
  * @returns Resolved value or undefined
  */
+/**
+ * Binding roots whose values only exist in client UI state (e.g. `@trait.*`
+ * resolves to another trait's current `render-ui` output, which lives in
+ * `@almadar/ui`'s slot manager, not on the server). Evaluator returns
+ * `undefined` for these without emitting a strict-mode warning — they're
+ * expected to round-trip through the server verbatim and be substituted at
+ * render time. Mirrors `CLIENT_ONLY_BINDING_ROOTS` in
+ * `@almadar/runtime/BindingResolver`.
+ */
+const CLIENT_ONLY_BINDING_ROOTS: ReadonlySet<string> = new Set(['trait']);
+
 export function resolveBinding(binding: string, ctx: EvaluationContext): unknown {
   if (!binding.startsWith('@')) {
     return undefined;
@@ -192,6 +203,12 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): unknown
   const parts = withoutPrefix.split('.');
   const root = parts[0];
   const path = parts.slice(1);
+
+  // Client-only bindings never resolve server-side. Short-circuit so
+  // strict-mode warnings don't fire on intentional-unresolved paths.
+  if (CLIENT_ONLY_BINDING_ROOTS.has(root)) {
+    return undefined;
+  }
 
   let value: unknown;
 
