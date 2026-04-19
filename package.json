@@ -1,6 +1,6 @@
 {
   "name": "@almadar/evaluator",
-  "version": "2.8.1",
+  "version": "2.9.0",
   "description": "S-expression evaluator for Almadar",
   "type": "module",
   "main": "./dist/index.js",
@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@almadar/core": ">=4.8.2",
-    "@almadar/operators": ">=3.0.0"
+    "@almadar/std": ">=6.5.0"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
