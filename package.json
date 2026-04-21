@@ -1,6 +1,6 @@
 {
   "name": "@almadar/evaluator",
-  "version": "2.9.1",
+  "version": "2.9.2",
   "description": "S-expression evaluator for Almadar",
   "type": "module",
   "main": "./dist/index.js",
@@ -34,7 +34,7 @@
     "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
-    "@almadar/core": ">=4.8.2",
+    "@almadar/core": ">=5.2.0",
     "@almadar/std": ">=6.5.0"
   },
   "devDependencies": {
