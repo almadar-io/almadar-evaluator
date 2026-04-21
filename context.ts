@@ -7,7 +7,7 @@
  * @packageDocumentation
  */
 
-import type { AgentContext } from '@almadar/core';
+import type { AgentContext, TraitConfig } from '@almadar/core';
 
 /**
  * User context for @user bindings (role-based UI).
@@ -52,6 +52,14 @@ export interface EvaluationContext {
 
   /** Local variables from 'let' bindings */
   locals?: Map<string, unknown>;
+
+  /**
+   * Call-site trait config for @config bindings. Populated by
+   * `OrbitalServerRuntime.executeEffects` from `RegisteredOrbital.configByTrait`.
+   * Molecules parameterize imported atoms through `config: { ... }` on the
+   * trait ref; the atom's render-ui reads `@config.icon`, `@config.title`, etc.
+   */
+  config?: TraitConfig;
 
   /**
    * When true, log warnings when bindings resolve to undefined. (RCG-01)
@@ -230,6 +238,13 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): unknown
         return ctx.now; // @now has no path
       case 'user':
         value = ctx.user;
+        break;
+      case 'config':
+        // Call-site trait config injected by OrbitalServerRuntime (see
+        // RegisteredOrbital.configByTrait). Molecules parameterize imported
+        // atoms through `config: { ... }` on the trait ref; the atom's
+        // render-ui reads `@config.icon`, `@config.title`, etc.
+        value = ctx.config;
         break;
       default:
         // Singleton entity reference (@EntityName.field)
