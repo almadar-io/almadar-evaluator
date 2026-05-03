@@ -67,6 +67,30 @@ describe('Dashboard aggregations', () => {
     expect(result[3]).toMatchObject({ label: 'Avg Units',     value: 15 / 6 });
   });
 
+  it('std-stats v2: per-metric filter narrows aggregation to matching rows', () => {
+    // Mirrors the new std-stats lambda body — `array/filter` runs over
+    // @payload.data with each metric's `filter` predicate before the
+    // aggregation kind dispatch. Lets a single metrics array yield
+    // "Total: 6" alongside "Active: 5" without two upstream queries.
+    const metrics = [
+      { aggregation: 'count', label: 'Total',  filter: true },                                                // unfiltered (true → all rows pass)
+      { aggregation: 'count', label: 'Active', filter: ['fn', 'row', ['=', '@row.status', 'active']] },        // explicit fn-form predicate
+      { aggregation: 'sum',   label: 'ActiveRevenue', field: 'amount', filter: ['fn', 'row', ['=', '@row.status', 'active']] },
+    ];
+    const result = evaluate(
+      ['array/map', metrics, ['fn', 'metric', {
+        label:   ['object/get', '@metric', 'label'],
+        value:   ['if', ['=', ['object/get', '@metric', 'aggregation', 'count'], 'sum'],
+                   ['array/sum', ['array/filter', '@payload.data', ['object/get', '@metric', 'filter', true]], ['object/get', '@metric', 'field', '']],
+                   ['array/len', ['array/filter', '@payload.data', ['object/get', '@metric', 'filter', true]]]],
+      }]],
+      ctx,
+    ) as Array<{ label: string; value: number }>;
+    expect(result[0]).toEqual({ label: 'Total',         value: 6 });
+    expect(result[1]).toEqual({ label: 'Active',        value: 5 });
+    expect(result[2]).toEqual({ label: 'ActiveRevenue', value: 10 + 25 + 5 + 7 + 50 });
+  });
+
   it('std-graphs: groupBy → entries → map produces {label, value} chart points', () => {
     // Mirrors std-graphs's `(set @entity.chartData (array/map (object/entries
     // (array/groupBy @payload.data @config.categoryField)) ["fn", "entry", ...]))`.

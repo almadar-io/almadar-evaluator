@@ -64,7 +64,18 @@ function evalWithItem(
   }
 
   const childCtx = createChildContext(ctx, locals);
-  return evaluate(expr, childCtx);
+  let result = evaluate(expr, childCtx);
+  // Re-evaluate when the immediate result is itself an SExpression. The
+  // canonical case is std-stats's per-metric filter: the lolo lambda
+  // dereferences `(object/get @metric "filter" true)` which returns the
+  // stored predicate SExpression as a value. Without this re-eval the
+  // predicate would be a literal array (truthy for every row). The
+  // re-eval recurses through fn-form via the operator branch above so
+  // `["fn", "row", body]` predicates bind @row=item correctly.
+  if (isSExpr(result)) {
+    result = evalWithItem(result as SExpr, evaluate, childCtx, item, index);
+  }
+  return result;
 }
 
 /**
