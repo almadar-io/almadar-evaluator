@@ -115,6 +115,20 @@ export class SExpressionEvaluator {
       if (isBinding(expr)) {
         return resolveBinding(expr, ctx);
       }
+      // Plain object literal — recursively evaluate each property so that
+      // SExpression values inside `{ key: (op ...), ... }` get reduced to
+      // their concrete results. This is the canonical lambda-body shape
+      // for `array/map` returning records (e.g. std-stats's metric→card
+      // lambda whose body is `{ label: (object/get ...), value: (if ...) }`).
+      // Without this, the evaluator returns the raw SExpression and the
+      // UI renders the lolo source as text.
+      if (this.isPlainObject(expr)) {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(expr as Record<string, unknown>)) {
+          out[k] = this.evaluate(v as SExpr, ctx);
+        }
+        return out;
+      }
       // Return literal value
       return expr;
     }
@@ -125,6 +139,16 @@ export class SExpressionEvaluator {
 
     // Dispatch to operator implementation
     return this.dispatchOperator(op, args, ctx);
+  }
+
+  private isPlainObject(value: unknown): value is Record<string, unknown> {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value) &&
+      !(value instanceof Date) &&
+      Object.getPrototypeOf(value) === Object.prototype
+    );
   }
 
   /**
