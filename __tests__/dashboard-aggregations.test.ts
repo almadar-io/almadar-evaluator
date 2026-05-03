@@ -67,22 +67,31 @@ describe('Dashboard aggregations', () => {
     expect(result[3]).toMatchObject({ label: 'Avg Units',     value: 15 / 6 });
   });
 
-  it('std-stats v2: per-metric filter narrows aggregation to matching rows', () => {
-    // Mirrors the new std-stats lambda body — `array/filter` runs over
-    // @payload.data with each metric's `filter` predicate before the
-    // aggregation kind dispatch. Lets a single metrics array yield
-    // "Total: 6" alongside "Active: 5" without two upstream queries.
+  it('std-stats v2: filterField/filterValue narrows aggregation by single-field equality', () => {
+    // Mirrors the new std-stats lambda body — each metric optionally
+    // supplies `filterField`+`filterValue`; the filter wraps array/filter
+    // with a fn-form predicate that compiles cleanly in both runtime and
+    // codegen paths (an SExpression-shaped `filter` would compile to
+    // `.filter(arrayValue)` which TypeErrors at runtime in the codegen
+    // path). Lets one metrics array yield "Total: 6" alongside
+    // "Active: 5" without a separate fetch.
     const metrics = [
-      { aggregation: 'count', label: 'Total',  filter: true },                                                // unfiltered (true → all rows pass)
-      { aggregation: 'count', label: 'Active', filter: ['fn', 'row', ['=', '@row.status', 'active']] },        // explicit fn-form predicate
-      { aggregation: 'sum',   label: 'ActiveRevenue', field: 'amount', filter: ['fn', 'row', ['=', '@row.status', 'active']] },
+      { aggregation: 'count', label: 'Total' },                                                            // no filter → all rows
+      { aggregation: 'count', label: 'Active',        filterField: 'status', filterValue: 'active' },
+      { aggregation: 'sum',   label: 'ActiveRevenue', field: 'amount', filterField: 'status', filterValue: 'active' },
     ];
+    const filterPred = ['fn', 'row',
+      ['if', ['=', ['object/get', '@metric', 'filterField', ''], ''],
+        true,
+        ['=',
+          ['object/get', '@row', ['object/get', '@metric', 'filterField', '']],
+          ['object/get', '@metric', 'filterValue', '']]]];
     const result = evaluate(
       ['array/map', metrics, ['fn', 'metric', {
         label:   ['object/get', '@metric', 'label'],
         value:   ['if', ['=', ['object/get', '@metric', 'aggregation', 'count'], 'sum'],
-                   ['array/sum', ['array/filter', '@payload.data', ['object/get', '@metric', 'filter', true]], ['object/get', '@metric', 'field', '']],
-                   ['array/len', ['array/filter', '@payload.data', ['object/get', '@metric', 'filter', true]]]],
+                   ['array/sum', ['array/filter', '@payload.data', filterPred], ['object/get', '@metric', 'field', '']],
+                   ['array/len', ['array/filter', '@payload.data', filterPred]]],
       }]],
       ctx,
     ) as Array<{ label: string; value: number }>;
