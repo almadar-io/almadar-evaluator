@@ -32,6 +32,7 @@ export {
 // Context
 export {
   type EvaluationContext,
+  type UserContext,
   createMinimalContext,
   createEffectContext,
   createChildContext,
