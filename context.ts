@@ -208,7 +208,21 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): unknown
   }
 
   const withoutPrefix = binding.slice(1);
-  const parts = withoutPrefix.split('.');
+  // Split on `.` but also expand bracket-index segments into separate
+  // path steps. `config.sections[0].bullets` -> ['config', 'sections',
+  // '0', 'bullets']. Indices are numeric strings; the navigation loop
+  // below handles them transparently against arrays (Array['0'] reads
+  // index 0). Lolos use bracket notation to address typed config
+  // arrays (e.g. `@config.sections[0].title` on a per-section split-
+  // section pattern); without this expansion the segment 'sections[0]'
+  // is looked up as a literal property name and resolves to undefined.
+  const parts = withoutPrefix.split('.').flatMap((seg) => {
+    const m = seg.match(/^([\w]+)((?:\[\d+\])+)$/);
+    if (!m) return [seg];
+    const head = m[1];
+    const indices = Array.from(m[2].matchAll(/\[(\d+)\]/g)).map((x) => x[1]);
+    return [head, ...indices];
+  });
   const root = parts[0];
   const path = parts.slice(1);
 
