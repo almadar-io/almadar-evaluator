@@ -14,6 +14,9 @@ import { isSExpr, getOperator, getArgs } from '../types/expression.js';
 
 type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
+/** Keys that must never be written via a path/merge — guards against prototype pollution. */
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 /**
  * Helper to evaluate a lambda expression with bound variable(s).
  */
@@ -148,6 +151,10 @@ export function evalObjectSet(
 
   const result = structuredClone(obj ?? {});
   const parts = path.split('.');
+  if (parts.some((p) => FORBIDDEN_KEYS.has(p))) {
+    // Refuse __proto__/constructor/prototype segments — prevents prototype pollution.
+    return result;
+  }
   let current = result;
 
   for (let i = 0; i < parts.length - 1; i++) {
@@ -219,6 +226,7 @@ export function evalObjectDeepMerge(
   ): Record<string, unknown> {
     const result = { ...target };
     for (const key of Object.keys(source)) {
+      if (FORBIDDEN_KEYS.has(key)) continue; // skip prototype-polluting keys
       if (
         source[key] !== null &&
         typeof source[key] === 'object' &&

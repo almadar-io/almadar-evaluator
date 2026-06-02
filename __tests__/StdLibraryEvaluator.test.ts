@@ -413,6 +413,19 @@ describe('StdLibraryEvaluator', () => {
       expect(result).toEqual({ a: 1, b: 2 });
     });
 
+    it('object/set refuses prototype-polluting paths (__proto__)', () => {
+      const probe: Record<string, unknown> = {};
+      evaluate(['object/set', {}, '__proto__.polluted', 'yes'], ctx);
+      evaluate(['object/set', {}, 'constructor.prototype.polluted', 'yes'], ctx);
+      expect(probe.polluted).toBeUndefined();
+    });
+
+    it('object/deepMerge ignores __proto__ keys', () => {
+      const probe: Record<string, unknown> = {};
+      evaluate(['object/deepMerge', {}, JSON.parse('{"__proto__":{"polluted":"yes"}}')], ctx);
+      expect(probe.polluted).toBeUndefined();
+    });
+
     it('object/has checks path exists', () => {
       ctx = createMinimalContext({ user: { name: 'John' } }, {});
       expect(evaluate(['object/has', '@entity.user', 'name'], ctx)).toBe(true);
