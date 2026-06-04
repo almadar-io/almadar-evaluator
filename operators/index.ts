@@ -50,6 +50,7 @@ export {
   evalConcat,
   evalIncludes,
   evalEmpty,
+  evalList,
 } from './collections.js';
 
 // Effect operators

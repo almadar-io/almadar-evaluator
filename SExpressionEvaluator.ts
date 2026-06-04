@@ -52,6 +52,7 @@ import {
   evalConcat,
   evalIncludes,
   evalEmpty,
+  evalList,
   evalSet,
   evalSetDynamic,
   evalIncrement,
@@ -318,6 +319,8 @@ export class SExpressionEvaluator {
         return evalIncludes(args, evaluate, ctx);
       case 'empty':
         return evalEmpty(args, evaluate, ctx);
+      case 'list':
+        return evalList(args, evaluate, ctx);
 
       // Effects
       case 'set':

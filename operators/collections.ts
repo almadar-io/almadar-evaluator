@@ -136,6 +136,18 @@ export function evalEmpty(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCon
 }
 
 /**
+ * `(list a b c …)` — literal array constructor. Evaluates each argument and
+ * returns them as a plain array. Lowering wraps a literal list bound for a
+ * literal-array slot in `list` so it is unambiguously data, never a call — the
+ * deterministic disambiguation for a list whose first element collides with an
+ * operator name (e.g. `[path method …]` would otherwise be read as the `path`
+ * operator call and collapse to a string).
+ */
+export function evalList(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown[] {
+  return args.map((arg) => evaluate(arg, ctx));
+}
+
+/**
  * Convert a value to an array.
  */
 function toArray(value: unknown): unknown[] {
