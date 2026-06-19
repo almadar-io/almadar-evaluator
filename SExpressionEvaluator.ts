@@ -89,6 +89,8 @@ import * as stdGeo from './std/geo.js';
 import * as stdGrid from './std/grid.js';
 import * as stdAnim from './std/anim.js';
 import * as stdEase from './std/ease.js';
+import * as stdNoise from './std/noise.js';
+import * as stdPath from './std/path.js';
 
 /**
  * JIT compilation cache for hot paths.
@@ -523,6 +525,24 @@ export class SExpressionEvaluator {
         return stdEase.evalEaseApply(args, evaluate, ctx);
       case 'ease/smoothstep':
         return stdEase.evalEaseSmoothstep(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: noise/*
+      // ===============================
+      case 'noise/perlin':
+        return stdNoise.evalNoisePerlin(args, evaluate, ctx);
+      case 'noise/simplex':
+        return stdNoise.evalNoiseSimplex(args, evaluate, ctx);
+      case 'noise/fbm':
+        return stdNoise.evalNoiseFbm(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: path/*
+      // ===============================
+      case 'path/astar':
+        return stdPath.evalPathAstar(args, evaluate, ctx);
+      case 'path/reachable':
+        return stdPath.evalPathReachable(args, evaluate, ctx);
 
       // ===============================
       // Standard Library: str/*

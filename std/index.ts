@@ -88,6 +88,12 @@ export {
 // Easing operators
 export { evalEaseApply, evalEaseSmoothstep } from './ease.js';
 
+// Noise operators
+export { evalNoisePerlin, evalNoiseSimplex, evalNoiseFbm } from './noise.js';
+
+// Path operators
+export { evalPathAstar, evalPathReachable } from './path.js';
+
 // String operators
 export {
   evalStrLen,
