@@ -24,7 +24,69 @@ export {
   evalMathRandom,
   evalMathRandomInt,
   evalMathDefault,
+  evalMathSin,
+  evalMathCos,
+  evalMathTan,
+  evalMathAtan2,
+  evalMathHypot,
+  evalMathDegRad,
+  evalMathRadDeg,
+  evalMathWrap,
+  evalMathApproach,
 } from './math.js';
+
+// Vector operators
+export {
+  evalVecAdd,
+  evalVecSub,
+  evalVecScale,
+  evalVecDot,
+  evalVecCross,
+  evalVecLength,
+  evalVecLengthSq,
+  evalVecNormalize,
+  evalVecDistance,
+  evalVecDistanceSq,
+  evalVecLerp,
+  evalVecAngle,
+  evalVecRotate,
+  evalVecClampLength,
+} from './vector.js';
+
+// Geometry operators
+export {
+  evalGeoAabbOverlap,
+  evalGeoCircleOverlap,
+  evalGeoRectCircleOverlap,
+  evalGeoPointInRect,
+  evalGeoPointInCircle,
+  evalGeoReflect,
+  evalGeoSegmentIntersect,
+} from './geo.js';
+
+// Grid operators
+export {
+  evalGridToWorld,
+  evalGridFromWorld,
+  evalGridIsoToScreen,
+  evalGridScreenToIso,
+  evalGridDistance,
+  evalGridManhattanDistance,
+  evalGridNeighbors,
+  evalGridCellsInRadius,
+  evalGridLine,
+  evalGridInBounds,
+} from './grid.js';
+
+// Animation operators
+export {
+  evalAnimFrameAt,
+  evalAnimSheetRect,
+  evalAnimDirectionFromDelta,
+} from './anim.js';
+
+// Easing operators
+export { evalEaseApply, evalEaseSmoothstep } from './ease.js';
 
 // String operators
 export {

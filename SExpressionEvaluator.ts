@@ -84,6 +84,11 @@ import * as stdAsync from './std/async.js';
 import * as stdProb from './std/prob.js';
 import * as stdOs from './std/os.js';
 import * as stdAgent from './std/agent.js';
+import * as stdVec from './std/vector.js';
+import * as stdGeo from './std/geo.js';
+import * as stdGrid from './std/grid.js';
+import * as stdAnim from './std/anim.js';
+import * as stdEase from './std/ease.js';
 
 /**
  * JIT compilation cache for hot paths.
@@ -408,6 +413,116 @@ export class SExpressionEvaluator {
         return stdMath.evalMathRandomInt(args, evaluate, ctx);
       case 'math/default':
         return stdMath.evalMathDefault(args, evaluate, ctx);
+      case 'math/sin':
+        return stdMath.evalMathSin(args, evaluate, ctx);
+      case 'math/cos':
+        return stdMath.evalMathCos(args, evaluate, ctx);
+      case 'math/tan':
+        return stdMath.evalMathTan(args, evaluate, ctx);
+      case 'math/atan2':
+        return stdMath.evalMathAtan2(args, evaluate, ctx);
+      case 'math/hypot':
+        return stdMath.evalMathHypot(args, evaluate, ctx);
+      case 'math/deg-rad':
+        return stdMath.evalMathDegRad(args, evaluate, ctx);
+      case 'math/rad-deg':
+        return stdMath.evalMathRadDeg(args, evaluate, ctx);
+      case 'math/wrap':
+        return stdMath.evalMathWrap(args, evaluate, ctx);
+      case 'math/approach':
+        return stdMath.evalMathApproach(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: vec/*
+      // ===============================
+      case 'vec/add':
+        return stdVec.evalVecAdd(args, evaluate, ctx);
+      case 'vec/sub':
+        return stdVec.evalVecSub(args, evaluate, ctx);
+      case 'vec/scale':
+        return stdVec.evalVecScale(args, evaluate, ctx);
+      case 'vec/dot':
+        return stdVec.evalVecDot(args, evaluate, ctx);
+      case 'vec/cross':
+        return stdVec.evalVecCross(args, evaluate, ctx);
+      case 'vec/length':
+        return stdVec.evalVecLength(args, evaluate, ctx);
+      case 'vec/length-sq':
+        return stdVec.evalVecLengthSq(args, evaluate, ctx);
+      case 'vec/normalize':
+        return stdVec.evalVecNormalize(args, evaluate, ctx);
+      case 'vec/distance':
+        return stdVec.evalVecDistance(args, evaluate, ctx);
+      case 'vec/distance-sq':
+        return stdVec.evalVecDistanceSq(args, evaluate, ctx);
+      case 'vec/lerp':
+        return stdVec.evalVecLerp(args, evaluate, ctx);
+      case 'vec/angle':
+        return stdVec.evalVecAngle(args, evaluate, ctx);
+      case 'vec/rotate':
+        return stdVec.evalVecRotate(args, evaluate, ctx);
+      case 'vec/clamp-length':
+        return stdVec.evalVecClampLength(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: geo/*
+      // ===============================
+      case 'geo/aabb-overlap':
+        return stdGeo.evalGeoAabbOverlap(args, evaluate, ctx);
+      case 'geo/circle-overlap':
+        return stdGeo.evalGeoCircleOverlap(args, evaluate, ctx);
+      case 'geo/rect-circle-overlap':
+        return stdGeo.evalGeoRectCircleOverlap(args, evaluate, ctx);
+      case 'geo/point-in-rect':
+        return stdGeo.evalGeoPointInRect(args, evaluate, ctx);
+      case 'geo/point-in-circle':
+        return stdGeo.evalGeoPointInCircle(args, evaluate, ctx);
+      case 'geo/reflect':
+        return stdGeo.evalGeoReflect(args, evaluate, ctx);
+      case 'geo/segment-intersect':
+        return stdGeo.evalGeoSegmentIntersect(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: grid/*
+      // ===============================
+      case 'grid/to-world':
+        return stdGrid.evalGridToWorld(args, evaluate, ctx);
+      case 'grid/from-world':
+        return stdGrid.evalGridFromWorld(args, evaluate, ctx);
+      case 'grid/iso-to-screen':
+        return stdGrid.evalGridIsoToScreen(args, evaluate, ctx);
+      case 'grid/screen-to-iso':
+        return stdGrid.evalGridScreenToIso(args, evaluate, ctx);
+      case 'grid/distance':
+        return stdGrid.evalGridDistance(args, evaluate, ctx);
+      case 'grid/manhattan-distance':
+        return stdGrid.evalGridManhattanDistance(args, evaluate, ctx);
+      case 'grid/neighbors':
+        return stdGrid.evalGridNeighbors(args, evaluate, ctx);
+      case 'grid/cells-in-radius':
+        return stdGrid.evalGridCellsInRadius(args, evaluate, ctx);
+      case 'grid/line':
+        return stdGrid.evalGridLine(args, evaluate, ctx);
+      case 'grid/in-bounds':
+        return stdGrid.evalGridInBounds(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: anim/*
+      // ===============================
+      case 'anim/frame-at':
+        return stdAnim.evalAnimFrameAt(args, evaluate, ctx);
+      case 'anim/sheet-rect':
+        return stdAnim.evalAnimSheetRect(args, evaluate, ctx);
+      case 'anim/direction-from-delta':
+        return stdAnim.evalAnimDirectionFromDelta(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: ease/*
+      // ===============================
+      case 'ease/apply':
+        return stdEase.evalEaseApply(args, evaluate, ctx);
+      case 'ease/smoothstep':
+        return stdEase.evalEaseSmoothstep(args, evaluate, ctx);
 
       // ===============================
       // Standard Library: str/*

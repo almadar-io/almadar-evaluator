@@ -217,3 +217,119 @@ export function evalMathDefault(
   }
   return n as number;
 }
+
+/**
+ * math/sin - sine of radians
+ */
+export function evalMathSin(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  return Math.sin(evaluate(args[0], ctx) as number);
+}
+
+/**
+ * math/cos - cosine of radians
+ */
+export function evalMathCos(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  return Math.cos(evaluate(args[0], ctx) as number);
+}
+
+/**
+ * math/tan - tangent of radians
+ */
+export function evalMathTan(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  return Math.tan(evaluate(args[0], ctx) as number);
+}
+
+/**
+ * math/atan2 - atan2(y, x) in radians
+ */
+export function evalMathAtan2(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  const y = evaluate(args[0], ctx) as number;
+  const x = evaluate(args[1], ctx) as number;
+  return Math.atan2(y, x);
+}
+
+/**
+ * math/hypot - sqrt(a² + b²)
+ */
+export function evalMathHypot(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  const a = evaluate(args[0], ctx) as number;
+  const b = evaluate(args[1], ctx) as number;
+  return Math.hypot(a, b);
+}
+
+/**
+ * math/deg-rad - degrees → radians (deg·π/180)
+ */
+export function evalMathDegRad(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  return (evaluate(args[0], ctx) as number) * (Math.PI / 180);
+}
+
+/**
+ * math/rad-deg - radians → degrees (rad·180/π)
+ */
+export function evalMathRadDeg(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  return (evaluate(args[0], ctx) as number) * (180 / Math.PI);
+}
+
+/**
+ * math/wrap - wrap v into [min, max); r<=0 → min
+ */
+export function evalMathWrap(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  const v = evaluate(args[0], ctx) as number;
+  const min = evaluate(args[1], ctx) as number;
+  const max = evaluate(args[2], ctx) as number;
+  const r = max - min;
+  if (r <= 0) {
+    return min;
+  }
+  return min + ((((v - min) % r) + r) % r);
+}
+
+/**
+ * math/approach - move cur toward target by at most maxD
+ */
+export function evalMathApproach(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  const cur = evaluate(args[0], ctx) as number;
+  const target = evaluate(args[1], ctx) as number;
+  const maxD = evaluate(args[2], ctx) as number;
+  if (Math.abs(target - cur) <= maxD) {
+    return target;
+  }
+  return cur + Math.sign(target - cur) * maxD;
+}
