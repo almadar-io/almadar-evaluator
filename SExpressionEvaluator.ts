@@ -268,6 +268,7 @@ export class SExpressionEvaluator {
 
       // Comparison
       case '=':
+      case '==':
         return evalEqual(args, evaluate, ctx);
       case '!=':
         return evalNotEqual(args, evaluate, ctx);
