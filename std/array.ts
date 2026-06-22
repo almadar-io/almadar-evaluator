@@ -153,7 +153,7 @@ export function evalArrayFirst(
   ctx: EvaluationContext
 ): unknown {
   const arr = evaluate(args[0], ctx) as unknown[];
-  return arr?.[0];
+  return arr?.[0] ?? null;
 }
 
 /**
@@ -165,7 +165,7 @@ export function evalArrayLast(
   ctx: EvaluationContext
 ): unknown {
   const arr = evaluate(args[0], ctx) as unknown[];
-  if (!Array.isArray(arr) || arr.length === 0) return undefined;
+  if (!Array.isArray(arr) || arr.length === 0) return null;
   return arr[arr.length - 1];
 }
 
@@ -179,7 +179,7 @@ export function evalArrayNth(
 ): unknown {
   const arr = evaluate(args[0], ctx) as unknown[];
   const index = evaluate(args[1], ctx) as number;
-  return arr?.[index];
+  return arr?.[index] ?? null;
 }
 
 /**
@@ -425,7 +425,9 @@ export function evalArrayFind(
 ): unknown {
   const arr = evaluate(args[0], ctx) as unknown[];
   const predExpr = args[1];
-  return (arr ?? []).find((item, i) => evalWithItem(predExpr, evaluate, ctx, item, i));
+  // No-match returns null (not JS `undefined`) to match the Rust FindOp
+  // contract and the `(!= (array/find …) null)` checks behaviors rely on.
+  return (arr ?? []).find((item, i) => evalWithItem(predExpr, evaluate, ctx, item, i)) ?? null;
 }
 
 /**
