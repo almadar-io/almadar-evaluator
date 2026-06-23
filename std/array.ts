@@ -133,6 +133,32 @@ export function evalArrayLen(
 }
 
 /**
+ * array/range - Generate a numeric range. Matches orbital-core ArrayRangeOp:
+ * (range n) => [0,n); (range start end) => [start,end); 3rd arg = step (default 1).
+ * start inclusive, end exclusive.
+ */
+export function evalArrayRange(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number[] {
+  const first = Number(evaluate(args[0], ctx));
+  const start = args.length === 1 ? 0 : first;
+  const end = args.length === 1 ? first : Number(evaluate(args[1], ctx));
+  const step = args.length > 2 ? Number(evaluate(args[2], ctx)) : 1;
+  const out: number[] = [];
+  if (!Number.isFinite(start) || !Number.isFinite(end) || !Number.isFinite(step) || step === 0) {
+    return out;
+  }
+  if (step > 0) {
+    for (let current = start; current < end; current += step) out.push(current);
+  } else {
+    for (let current = start; current > end; current += step) out.push(current);
+  }
+  return out;
+}
+
+/**
  * array/empty? - Check if array is empty
  */
 export function evalArrayEmpty(

@@ -128,6 +128,7 @@ export {
 // Array operators
 export {
   evalArrayLen,
+  evalArrayRange,
   evalArrayEmpty,
   evalArrayFirst,
   evalArrayLast,

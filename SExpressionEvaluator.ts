@@ -610,6 +610,8 @@ export class SExpressionEvaluator {
       // ===============================
       case 'array/len':
         return stdArray.evalArrayLen(args, evaluate, ctx);
+      case 'array/range':
+        return stdArray.evalArrayRange(args, evaluate, ctx);
       case 'array/empty?':
         return stdArray.evalArrayEmpty(args, evaluate, ctx);
       case 'array/first':
