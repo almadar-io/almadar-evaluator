@@ -10,7 +10,7 @@
 
 import type { SExpr } from '../types/expression.js';
 import type { EvaluationContext } from '../context.js';
-import type { AgentMemoryCategory, AgentCompactStrategy, AgentGenerateOptions } from '@almadar/core';
+import type { AgentMemoryCategory, AgentCompactStrategy, AgentGenerateOptions, ServiceParams } from '@almadar/core';
 
 type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
@@ -284,7 +284,7 @@ export function evalAgentInvoke(
 ): unknown {
   if (!ctx.agent) return null;
   const toolName = evaluate(args[0], ctx) as string;
-  const toolArgs = evaluate(args[1], ctx) as Record<string, unknown>;
+  const toolArgs = evaluate(args[1], ctx) as ServiceParams;
   return ctx.agent.invoke(toolName, toolArgs);
 }
 
