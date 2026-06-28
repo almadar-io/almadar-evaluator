@@ -1,6 +1,6 @@
 {
   "name": "@almadar/evaluator",
-  "version": "2.16.0",
+  "version": "2.17.0",
   "description": "S-expression evaluator for Almadar",
   "type": "module",
   "main": "./dist/index.js",
