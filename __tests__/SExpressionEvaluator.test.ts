@@ -875,7 +875,7 @@ describe('SExpressionEvaluator', () => {
       expect(evaluate(['array/map', [], ['fn', 'x', ['*', '@x', 2]]], ctx)).toEqual([]);
       expect(evaluate(['array/filter', [], ['fn', 'x', true]], ctx)).toEqual([]);
       expect(evaluate(['array/reduce', [], 0, ['fn', ['a', 'x'], ['+', '@a', '@x']]], ctx)).toBe(0);
-      expect(evaluate(['array/find', [], ['fn', 'x', true]], ctx)).toBeUndefined();
+      expect(evaluate(['array/find', [], ['fn', 'x', true]], ctx)).toBeNull();
     });
 
     it('single element array operations', () => {
