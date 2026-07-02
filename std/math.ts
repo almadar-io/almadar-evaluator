@@ -252,6 +252,39 @@ export function evalMathTan(
 }
 
 /**
+ * math/asin - arcsine (inverse sine) in radians
+ */
+export function evalMathAsin(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  return Math.asin(evaluate(args[0], ctx) as number);
+}
+
+/**
+ * math/acos - arccosine (inverse cosine) in radians
+ */
+export function evalMathAcos(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  return Math.acos(evaluate(args[0], ctx) as number);
+}
+
+/**
+ * math/atan - arctangent (inverse tangent) in radians
+ */
+export function evalMathAtan(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  return Math.atan(evaluate(args[0], ctx) as number);
+}
+
+/**
  * math/atan2 - atan2(y, x) in radians
  */
 export function evalMathAtan2(

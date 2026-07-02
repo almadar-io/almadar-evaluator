@@ -424,6 +424,12 @@ export class SExpressionEvaluator {
         return stdMath.evalMathTan(args, evaluate, ctx);
       case 'math/atan2':
         return stdMath.evalMathAtan2(args, evaluate, ctx);
+      case 'math/asin':
+        return stdMath.evalMathAsin(args, evaluate, ctx);
+      case 'math/acos':
+        return stdMath.evalMathAcos(args, evaluate, ctx);
+      case 'math/atan':
+        return stdMath.evalMathAtan(args, evaluate, ctx);
       case 'math/hypot':
         return stdMath.evalMathHypot(args, evaluate, ctx);
       case 'math/deg-rad':
