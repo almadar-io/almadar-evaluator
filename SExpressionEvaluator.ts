@@ -84,6 +84,12 @@ import * as stdAsync from './std/async.js';
 import * as stdProb from './std/prob.js';
 import * as stdOs from './std/os.js';
 import * as stdAgent from './std/agent.js';
+import * as stdLlm from './std/llm.js';
+import * as stdWorkspace from './std/workspace.js';
+import * as stdSession from './std/session.js';
+import * as stdMemory from './std/memory.js';
+import * as stdTrace from './std/trace.js';
+import * as stdIntegration from './std/integration.js';
 import * as stdVec from './std/vector.js';
 import * as stdGeo from './std/geo.js';
 import * as stdGrid from './std/grid.js';
@@ -975,6 +981,64 @@ export class SExpressionEvaluator {
       case 'agent/label':            return stdAgent.evalAgentLabel(args, evaluate, ctx);
       // Effects (search)
       case 'agent/search-code':      return stdAgent.evalAgentSearchCode(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: llm/*
+      // ===============================
+      case 'llm/generate':           return stdLlm.evalLlmGenerate(args, evaluate, ctx);
+      case 'llm/call-tools':         return stdLlm.evalLlmCallTools(args, evaluate, ctx);
+      case 'llm/embed':              return stdLlm.evalLlmEmbed(args, evaluate, ctx);
+      case 'llm/token-count':        return stdLlm.evalLlmTokenCount(args, evaluate, ctx);
+      case 'llm/switch':             return stdLlm.evalLlmSwitch(args, evaluate, ctx);
+      case 'llm/compact':            return stdLlm.evalLlmCompact(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: workspace/*
+      // ===============================
+      case 'workspace/read-orbital':   return stdWorkspace.evalWorkspaceReadOrbital(args, evaluate, ctx);
+      case 'workspace/write-orbital':  return stdWorkspace.evalWorkspaceWriteOrbital(args, evaluate, ctx);
+      case 'workspace/read-file':      return stdWorkspace.evalWorkspaceReadFile(args, evaluate, ctx);
+      case 'workspace/write-file':     return stdWorkspace.evalWorkspaceWriteFile(args, evaluate, ctx);
+      case 'workspace/exists':         return stdWorkspace.evalWorkspaceExists(args, evaluate, ctx);
+      case 'workspace/list-orbitals':  return stdWorkspace.evalWorkspaceListOrbitals(args, evaluate, ctx);
+      case 'workspace/read-schema':    return stdWorkspace.evalWorkspaceReadSchema(args, evaluate, ctx);
+      case 'workspace/write-schema':   return stdWorkspace.evalWorkspaceWriteSchema(args, evaluate, ctx);
+      case 'workspace/read-plan':      return stdWorkspace.evalWorkspaceReadPlan(args, evaluate, ctx);
+      case 'workspace/write-plan':     return stdWorkspace.evalWorkspaceWritePlan(args, evaluate, ctx);
+      case 'workspace/archive-orbital': return stdWorkspace.evalWorkspaceArchiveOrbital(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: session/*
+      // ===============================
+      case 'session/read-spec':        return stdSession.evalSessionReadSpec(args, evaluate, ctx);
+      case 'session/write-spec':       return stdSession.evalSessionWriteSpec(args, evaluate, ctx);
+      case 'session/read-memory':      return stdSession.evalSessionReadMemory(args, evaluate, ctx);
+      case 'session/write-memory':     return stdSession.evalSessionWriteMemory(args, evaluate, ctx);
+      case 'session/read-history':     return stdSession.evalSessionReadHistory(args, evaluate, ctx);
+      case 'session/append-history':   return stdSession.evalSessionAppendHistory(args, evaluate, ctx);
+      case 'session/read-errors':      return stdSession.evalSessionReadErrors(args, evaluate, ctx);
+      case 'session/write-errors':     return stdSession.evalSessionWriteErrors(args, evaluate, ctx);
+      case 'session/read-analysis':    return stdSession.evalSessionReadAnalysis(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: memory/*
+      // ===============================
+      case 'memory/recall':          return stdMemory.evalMemoryRecall(args, evaluate, ctx);
+      case 'memory/store':           return stdMemory.evalMemoryStore(args, evaluate, ctx);
+      case 'memory/list':            return stdMemory.evalMemoryList(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: trace/*
+      // ===============================
+      case 'trace/emit':             return stdTrace.evalTraceEmit(args, evaluate, ctx);
+      case 'trace/log':              return stdTrace.evalTraceLog(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: integration/*
+      // ===============================
+      case 'integration/http':                return stdIntegration.evalIntegrationHttp(args, evaluate, ctx);
+      case 'integration/github-get-repo':     return stdIntegration.evalIntegrationGithubGetRepo(args, evaluate, ctx);
+      case 'integration/github-create-issue': return stdIntegration.evalIntegrationGithubCreateIssue(args, evaluate, ctx);
 
       default:
         console.warn(`Unknown operator: ${op}`);

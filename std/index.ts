@@ -305,3 +305,11 @@ export * from './os.js';
 
 // Agent operators
 export * from './agent.js';
+
+// Substrate operators
+export * from './llm.js';
+export * from './workspace.js';
+export * from './session.js';
+export * from './memory.js';
+export * from './trace.js';
+export * from './integration.js';

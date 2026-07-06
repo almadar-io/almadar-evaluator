@@ -7,7 +7,7 @@
  * @packageDocumentation
  */
 
-import type { AgentContext, TraitConfig } from '@almadar/core';
+import type { AgentContext, LlmContext, WorkspaceContext, SessionContext, MemoryContext, TraceContext, IntegrationContext, TraitConfig } from '@almadar/core';
 
 /**
  * User context for @user bindings (role-based UI).
@@ -82,6 +82,14 @@ export interface EvaluationContext {
 
   /** Agent context for agent/* operators (memory, LLM, tools, session) */
   agent?: AgentContext;
+
+  /** Substrate contexts for llm/*, workspace/*, session/*, memory/*, trace/*, integration/* operators */
+  llm?: LlmContext;
+  workspace?: WorkspaceContext;
+  session?: SessionContext;
+  memory?: MemoryContext;
+  trace?: TraceContext;
+  integration?: IntegrationContext;
 
   // ============================================================================
   // Effect Handlers (for executing side effects)
