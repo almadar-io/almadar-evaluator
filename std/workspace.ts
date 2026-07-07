@@ -9,6 +9,7 @@
 
 import type { SExpr } from '../types/expression.js';
 import type { EvaluationContext } from '../context.js';
+import { isOrbital, isOrbitalSchemaValue, isPlanSnapshot } from './substrate-guards.js';
 
 type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
@@ -22,6 +23,9 @@ export function evalWorkspaceWriteOrbital(args: SExpr[], evaluate: EvalFn, ctx: 
   if (!ctx.workspace) return null;
   const name = evaluate(args[0], ctx) as string;
   const content = evaluate(args[1], ctx);
+  if (!isOrbital(content)) {
+    throw new Error(`workspace/write-orbital value for "${name}" is not a valid orbital definition`);
+  }
   return ctx.workspace.writeOrbital(name, content);
 }
 
@@ -57,6 +61,9 @@ export function evalWorkspaceReadSchema(_args: SExpr[], _evaluate: EvalFn, ctx: 
 export function evalWorkspaceWriteSchema(args: SExpr[], evaluate: EvalFn, ctx: EvaluationContext): Promise<void> | null {
   if (!ctx.workspace) return null;
   const schema = evaluate(args[0], ctx);
+  if (!isOrbitalSchemaValue(schema)) {
+    throw new Error('workspace/write-schema value is not a valid orbital schema');
+  }
   return ctx.workspace.writeSchema(schema);
 }
 
@@ -68,6 +75,9 @@ export function evalWorkspaceReadPlan(_args: SExpr[], _evaluate: EvalFn, ctx: Ev
 export function evalWorkspaceWritePlan(args: SExpr[], evaluate: EvalFn, ctx: EvaluationContext): Promise<void> | null {
   if (!ctx.workspace) return null;
   const plan = evaluate(args[0], ctx);
+  if (!isPlanSnapshot(plan)) {
+    throw new Error('workspace/write-plan value is not a valid plan snapshot (schemaVersion 1 envelope)');
+  }
   return ctx.workspace.writePlan(plan);
 }
 

@@ -9,6 +9,7 @@
 
 import type { SExpr } from '../types/expression.js';
 import type { EvaluationContext } from '../context.js';
+import { isFieldValue } from './substrate-guards.js';
 
 type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
@@ -17,6 +18,9 @@ export function evalIntegrationHttp(args: SExpr[], evaluate: EvalFn, ctx: Evalua
   const method = evaluate(args[0], ctx) as string;
   const url = evaluate(args[1], ctx) as string;
   const body = args.length > 2 ? evaluate(args[2], ctx) : undefined;
+  if (body !== undefined && !isFieldValue(body)) {
+    throw new Error(`integration/http body for ${method} ${url} is not a field value (JSON-like)`);
+  }
   const headers = args.length > 3 ? (evaluate(args[3], ctx) as Record<string, string>) : undefined;
   return ctx.integration.http(method, url, body, headers);
 }
