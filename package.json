@@ -34,7 +34,7 @@
     "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
-    "@almadar/core": "^10.21.0",
+    "@almadar/core": "^10.23.0",
     "@almadar/std": ">=6.5.0"
   },
   "devDependencies": {
