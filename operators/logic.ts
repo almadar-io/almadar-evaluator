@@ -12,28 +12,40 @@ type Evaluator = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
 /**
  * Evaluate logical AND: ["and", a, b, ...]
- * Short-circuits: returns false as soon as any argument is falsy.
+ * Operand semantics (matches JS `&&` and the compiled TS path — Phase 5,
+ * R-OR-AND-RETURN-BOOLEAN): returns the first falsy argument's VALUE, or the
+ * last argument's value if all are truthy. Short-circuits — does not evaluate
+ * past the first falsy. (When every operand is boolean — the case for all
+ * shipping behaviors — this is observationally identical to returning a
+ * boolean.)
  */
-export function evalAnd(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): boolean {
+export function evalAnd(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+  let last: unknown = true;
   for (const arg of args) {
-    if (!toBoolean(evaluate(arg, ctx))) {
-      return false;
+    last = evaluate(arg, ctx);
+    if (!toBoolean(last)) {
+      return last;
     }
   }
-  return true;
+  return last;
 }
 
 /**
  * Evaluate logical OR: ["or", a, b, ...]
- * Short-circuits: returns true as soon as any argument is truthy.
+ * Operand semantics (matches JS `||` and the compiled TS path — Phase 5,
+ * R-OR-AND-RETURN-BOOLEAN): returns the first truthy argument's VALUE, or the
+ * last argument's value if all are falsy. Short-circuits — does not evaluate
+ * past the first truthy.
  */
-export function evalOr(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): boolean {
+export function evalOr(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+  let last: unknown = false;
   for (const arg of args) {
-    if (toBoolean(evaluate(arg, ctx))) {
-      return true;
+    last = evaluate(arg, ctx);
+    if (toBoolean(last)) {
+      return last;
     }
   }
-  return false;
+  return last;
 }
 
 /**

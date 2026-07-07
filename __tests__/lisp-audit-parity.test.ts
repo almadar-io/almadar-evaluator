@@ -10,9 +10,9 @@
  * and the `and`/`or` divergence probes.
  *
  * Self-contained in-package: does **not** touch the deprecated
- * `almadar-test-schemas` goldens. The `and`/`or` cases are pinned to the
- * **current** runtime return value (boolean); Phase 5 (R-OR-AND-RETURN-BOOLEAN)
- * flips them to operand semantics and updates the `expected` here.
+ * `almadar-test-schemas` goldens. The `and`/`or` cases use **operand
+ * semantics** (Phase 5, R-OR-AND-RETURN-BOOLEAN) — `and`/`or` return the
+ * operand value (JS `&&`/`||`), matching the compiled TS path.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -26,8 +26,6 @@ interface ParityCase {
     expected: number | string | boolean;
     /** Numeric float result → compare with `toBeCloseTo` instead of `toEqual`. */
     float?: boolean;
-    /** Marks the `and`/`or` cases whose expected value flips in Phase 5. */
-    phase5Target?: number | string | boolean;
 }
 
 const cases: ParityCase[] = [
@@ -72,32 +70,28 @@ const cases: ParityCase[] = [
     { label: 'math/cos(0)', expr: ['math/cos', 0], expected: 1, float: true },
     { label: 'math/sin(0)', expr: ['math/sin', 0], expected: 0, float: true },
 
-    // --- and/or divergence probes: pinned to CURRENT runtime (boolean). ---
-    // Phase 5 (R-OR-AND-RETURN-BOOLEAN) adopts operand semantics; update
-    // `expected` to `phase5Target` when that lands.
+    // --- and/or probes: operand semantics (Phase 5, R-OR-AND-RETURN-BOOLEAN). ---
+    // `and`/`or` now return the operand value (JS `&&`/`||`), matching the
+    // compiled TS path — aligned here from the prior boolean-coercion runtime.
     {
         label: 'and true false → false',
         expr: ['and', true, false],
         expected: false,
-        phase5Target: false,
     },
     {
-        label: 'or false 42 → true (pre-Phase-5 boolean)',
+        label: 'or false 42 → 42 (operand semantics)',
         expr: ['or', false, 42],
-        expected: true,
-        phase5Target: 42,
+        expected: 42,
     },
     {
-        label: 'and true "x" → true (pre-Phase-5 boolean)',
+        label: 'and true "x" → "x" (last truthy operand)',
         expr: ['and', true, 'x'],
-        expected: true,
-        phase5Target: 'x',
+        expected: 'x',
     },
     {
-        label: 'or 0 null 7 → true (pre-Phase-5 boolean)',
+        label: 'or 0 null 7 → 7 (first truthy operand)',
         expr: ['or', 0, null, 7],
-        expected: true,
-        phase5Target: 7,
+        expected: 7,
     },
 ];
 
