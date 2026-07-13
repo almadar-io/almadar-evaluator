@@ -55,6 +55,49 @@ describe('SExpressionEvaluator', () => {
   });
 
   // ============================================================================
+  // Data literals (inlined plain-object configs)
+  // ============================================================================
+
+  describe('data literals', () => {
+    it('passes string-headed data arrays through verbatim with zero warnings', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const manifest = {
+          units: {
+            knight: { animations: ['static'], frames: ['idle', 'walk', 'attack'] },
+          },
+          empty: [],
+          nested: [['idle', 0], ['walk', 1]],
+        };
+        const result = evaluate(manifest, ctx);
+        expect(warn).not.toHaveBeenCalled();
+        expect(result).toEqual(manifest);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('reduces real S-expressions nested inside data literals', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const result = evaluate(
+          { damage: ['+', 1, 2], animations: ['static'], pos: ['array/concat', [1], [2]] },
+          ctx
+        );
+        expect(warn).not.toHaveBeenCalled();
+        expect(result).toEqual({ damage: 3, animations: ['static'], pos: [1, 2] });
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('still dispatches a real operator array as a call', () => {
+      expect(evaluate(['+', 1, 2], ctx)).toBe(3);
+      expect(evaluate(['list', 'a', 'b'], ctx)).toEqual(['a', 'b']);
+    });
+  });
+
+  // ============================================================================
   // Binding Resolution
   // ============================================================================
 

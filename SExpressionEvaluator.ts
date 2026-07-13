@@ -109,6 +109,12 @@ const jitCache = new Map<string, (ctx: EvaluationContext) => unknown>();
 const MAX_JIT_CACHE_SIZE = 1000;
 
 /**
+ * Sentinel returned by dispatchOperator when the head is not a registered
+ * operator — the caller then treats the array as literal data.
+ */
+const UNKNOWN_OPERATOR = Symbol('unknown-operator');
+
+/**
  * S-Expression Evaluator class.
  *
  * Provides runtime interpretation of S-expressions for guards, effects, and computed values.
@@ -142,6 +148,16 @@ export class SExpressionEvaluator {
         }
         return out;
       }
+      // Literal array (non-call — first element is not a string operator):
+      // evaluate each element so SExpressions nested inside `[ {…}, … ]`
+      // reduce to concrete values. Parity with orbital-core `eval_expr`
+      // ("Literal array - evaluate all elements"); without it, values
+      // fetched later via `object/get` out of a concatenated literal row
+      // surface as raw lolo source (e.g. a unit's position/asset reaching
+      // the canvas as unevaluated expressions).
+      if (Array.isArray(expr)) {
+        return expr.map((item) => this.evaluate(item as SExpr, ctx));
+      }
       // Return literal value
       return expr;
     }
@@ -150,8 +166,16 @@ export class SExpressionEvaluator {
     const op = getOperator(expr)!;
     const args = getArgs(expr);
 
-    // Dispatch to operator implementation
-    return this.dispatchOperator(op, args, ctx);
+    // Dispatch to operator implementation. An unregistered head means the
+    // array is DATA, not a call form (e.g. `animations: ["static"]` inlined
+    // from an asset manifest): reduce its elements verbatim instead of
+    // warning "Unknown operator" per evaluation (~17k/s on large grids) and
+    // dropping the array from the evaluated copy.
+    const result = this.dispatchOperator(op, args, ctx);
+    if (result === UNKNOWN_OPERATOR) {
+      return expr.map((item) => this.evaluate(item as SExpr, ctx));
+    }
+    return result;
   }
 
   private isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -1003,8 +1027,7 @@ export class SExpressionEvaluator {
       case 'integration/github-create-issue': return stdIntegration.evalIntegrationGithubCreateIssue(args, evaluate, ctx);
 
       default:
-        console.warn(`Unknown operator: ${op}`);
-        return undefined;
+        return UNKNOWN_OPERATOR;
     }
   }
 }
