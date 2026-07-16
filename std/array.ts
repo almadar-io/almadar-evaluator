@@ -74,6 +74,12 @@ function evalWithItem(
   // `["fn", "row", body]` predicates bind @row=item correctly.
   if (isSExpr(result)) {
     result = evalWithItem(result as SExpr, evaluate, childCtx, item, index);
+  } else if (typeof result === 'function') {
+    // The literal-object reduction pass already dispatched the stored
+    // `["fn", …]` to an evalFn closure (config literals are evaluated once
+    // wholesale), so apply the closure per evalFn's `(item, evaluate, ctx)`
+    // contract instead of returning it as a truthy predicate.
+    result = (result as (item: unknown, evaluate: EvalFn, ctx: EvaluationContext) => unknown)(item, evaluate, childCtx);
   }
   return result;
 }

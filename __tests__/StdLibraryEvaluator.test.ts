@@ -307,6 +307,23 @@ describe('StdLibraryEvaluator', () => {
       expect(result).toEqual([3, 4, 5]);
     });
 
+    it('array/filter applies a pre-evaluated fn closure fetched from a config literal', () => {
+      // Config literals carrying `["fn", …]` values are reduced wholesale by
+      // the literal-object pass, so `object/get` hands back an evalFn closure,
+      // not the raw sexpr (std-stats per-metric filter). The closure must be
+      // applied per item — returned raw it is truthy and keeps every row.
+      const metrics = [
+        { aggregation: 'count', filter: ['fn', 'row', ['=', '@row.status', 'done']], label: 'Done' },
+      ];
+      const rows = [{ status: 'todo' }, { status: 'done' }, { status: 'done' }];
+      ctx = createMinimalContext({}, { data: rows });
+      const result = evaluate(
+        ['array/map', metrics, ['fn', 'metric', ['array/len', ['array/filter', '@payload.data', ['object/get', '@metric', 'filter', true]]]]],
+        ctx
+      );
+      expect(result).toEqual([2]);
+    });
+
     it('array/map transforms with @item expression', () => {
       ctx = createMinimalContext({ items: [1, 2, 3] }, {});
       const result = evaluate(
