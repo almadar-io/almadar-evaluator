@@ -308,6 +308,21 @@ describe('SExpressionEvaluator', () => {
       expect(result).toBe(30);
     });
 
+    it('threads let bindings sequentially — a later binding can reference an earlier one', () => {
+      // Regression guard for a bug where evalLet evaluated every binding's
+      // value expression against the ORIGINAL context instead of the
+      // accumulating scope, so `@x` inside `y`'s expression resolved
+      // undefined. Matches EffectExecutor's own (correct) `let` semantics —
+      // see std-evade-chase.lolo's `chase` tick for a real multi-step chain
+      // this exact shape corrupted (chaser positions collapsing to 0,0).
+      const result = evaluate(
+        ['let', [['x', 10], ['y', ['+', '@x', 5]], ['z', ['*', '@y', 2]]], ['+', '@x', ['+', '@y', '@z']]],
+        { ...ctx, locals: new Map() }
+      );
+      // x=10, y=x+5=15, z=y*2=30 -> x+y+z = 10+15+30 = 55
+      expect(result).toBe(55);
+    });
+
     it('evaluates do blocks', () => {
       let sideEffect = 0;
       const effectCtx = createEffectContext(ctx, {

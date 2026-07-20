@@ -15,6 +15,17 @@ type Evaluator = (expr: SExpr, ctx: EvaluationContext) => unknown;
  * Supports two formats:
  *   - Array of pairs: ["let", [["x", 10], ["y", 20]], body]
  *   - Object style:   ["let", {"x": 10, "y": 20}, body]
+ *
+ * Sequential (`let*`) semantics: each binding's value expression can
+ * reference any EARLIER binding in the same `let` via `@<name>` — matches
+ * `@almadar/runtime`'s `EffectExecutor` `let` case (its own, independent
+ * implementation, which already threads bindings this way) and how `.lolo`
+ * is authored in practice: multi-step chains where a later step's formula
+ * builds on an earlier one (e.g. std-evade-chase's `chase` tick computing
+ * `nc2x` from `nc1x`). Evaluating every binding against the original,
+ * unmodified `ctx` (the prior behavior here) left every cross-binding
+ * reference unresolved (`undefined`), silently corrupting any `let` with
+ * dependent bindings.
  */
 export function evalLet(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
   const rawBindings = args[0];
@@ -25,15 +36,18 @@ export function evalLet(args: SExpr[], evaluate: Evaluator, ctx: EvaluationConte
     ? (rawBindings as SExpr[][]).map(b => [b[0] as string, b[1]])
     : Object.entries(rawBindings as Record<string, SExpr>);
 
-  // Evaluate bindings and create new context
+  // Evaluate each binding against the locals accumulated so far, then fold
+  // it in before evaluating the next one.
   const locals = new Map<string, unknown>();
+  let childCtx = ctx;
   for (const [name, valueExpr] of bindingPairs) {
-    const value = evaluate(valueExpr, ctx);
+    const value = evaluate(valueExpr, childCtx);
     locals.set(name, value);
+    childCtx = createChildContext(ctx, locals);
   }
 
-  // Evaluate body with new context
-  const childCtx = createChildContext(ctx, locals);
+  // Evaluate body with the fully-accumulated context (childCtx === ctx,
+  // unchanged, when there are no bindings).
   return evaluate(body, childCtx);
 }
 
