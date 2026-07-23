@@ -8,6 +8,7 @@
  */
 
 import type { SExpr } from './types/expression.js';
+import { assertOperatorArity } from './operator-arity.js';
 import { isSExpr, isBinding, getOperator, getArgs } from './types/expression.js';
 import type { EvaluationContext } from './context.js';
 import { resolveBinding } from './context.js';
@@ -265,6 +266,12 @@ export class SExpressionEvaluator {
    * Dispatch to the appropriate operator implementation.
    */
   private dispatchOperator(op: string, args: SExpr[], ctx: EvaluationContext): unknown {
+    // Parity with the compiled path's `resolve_sexpr_call`: a registered
+    // operator applied outside its canonical arity bounds throws instead of
+    // silently truncating/wrapping (R-EVALUATOR-NO-ARITY-CHECK). Unregistered
+    // heads fall through to the data-array handling unchanged.
+    assertOperatorArity(op, args.length);
+
     // Bind evaluate method for passing to operator implementations
     const evaluate = (expr: SExpr, c: EvaluationContext) => this.evaluate(expr, c);
 
