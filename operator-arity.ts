@@ -11,15 +11,13 @@
  * Operators absent from the registry impose no bounds — the evaluator's
  * data-array fallback handles unregistered heads.
  */
-import { createRequire } from 'node:module';
-
-// CJS require of the JSON registry: a plain ESM JSON import needs
-// `with { type: 'json' }` import attributes, which not every consumer's
-// bundler/runtime carries through (the playground server boots dist under
-// plain node and crashed on ERR_IMPORT_ATTRIBUTE_MISSING). `createRequire`
-// resolves and parses the JSON identically everywhere.
-const require = createRequire(import.meta.url);
-const canonicalOperators: CanonicalOperatorsFile = require('@almadar/std/canonical-operators.json');
+// The registry JSON is INLINED into the evaluator dist at build time (tsup
+// bundles the import — no runtime resolution). Runtime alternatives both
+// break a consumer class: a live ESM JSON import needs `with {type:'json'}`
+// attributes plain node dists don't carry (playground server crash), and
+// `createRequire('node:module')` doesn't exist in browser bundles (Vite
+// shell-client build failure). Inlining works everywhere.
+import canonicalOperators from '@almadar/std/canonical-operators.json';
 
 interface CanonicalOperatorMeta {
   minArity?: number;
@@ -31,7 +29,7 @@ interface CanonicalOperatorsFile {
 }
 
 const ARITY: ReadonlyMap<string, { min: number; max: number | null }> = new Map(
-  Object.entries(canonicalOperators.operators).map(
+  Object.entries((canonicalOperators as CanonicalOperatorsFile).operators).map(
     ([name, meta]) => [
       name,
       { min: meta.minArity ?? 0, max: meta.maxArity === undefined ? null : meta.maxArity },
