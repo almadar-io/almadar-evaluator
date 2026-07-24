@@ -8,7 +8,7 @@
  */
 
 import type { SExpr } from './types/expression.js';
-import { assertOperatorArity } from './operator-arity.js';
+import { assertOperatorArity } from '@almadar/std/registry';
 import { isSExpr, isBinding, getOperator, getArgs } from './types/expression.js';
 import type { EvaluationContext } from './context.js';
 import { resolveBinding } from './context.js';
