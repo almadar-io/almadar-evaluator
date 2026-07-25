@@ -10,22 +10,11 @@
 import type { AgentContext, LlmContext, WorkspaceContext, SessionContext, MemoryContext, TraceContext, IntegrationContext, TraitConfig } from '@almadar/core';
 
 /**
- * User context for @user bindings (role-based UI).
+ * User context for `@user` bindings — owned by `@almadar/core` so the
+ * interpreter and the compiled shell resolve the same field names.
  */
-export interface UserContext {
-  /** User's unique ID */
-  id: string;
-  /** User's email */
-  email?: string;
-  /** User's display name */
-  name?: string;
-  /** User's role (for RBAC) */
-  role?: string;
-  /** User's permissions */
-  permissions?: string[];
-  /** Additional custom profile fields */
-  [key: string]: unknown;
-}
+export type { UserContext } from '@almadar/core';
+import type { UserContext } from '@almadar/core';
 
 /**
  * Evaluation context for S-expression evaluation.
