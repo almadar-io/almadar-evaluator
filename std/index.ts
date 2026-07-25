@@ -303,6 +303,11 @@ export {
 // OS operators
 export * from './os.js';
 
+// ML circuit-side operators
+export * from './contract.js';
+export * from './graph.js';
+export * from './data.js';
+
 // Substrate operators
 export * from './llm.js';
 export * from './workspace.js';

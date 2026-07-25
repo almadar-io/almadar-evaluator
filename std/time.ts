@@ -101,12 +101,17 @@ export function evalTimeFormat(
     ][date.getMonth()],
   };
 
-  let result = format;
-  for (const [token, value] of Object.entries(tokens)) {
-    result = result.replace(new RegExp(token, 'g'), value);
-  }
+  // One pass, longest token first: replacing in map order lets `MM` consume
+  // the head of `MMM` ("MMM D" → "077 5"), and a multi-pass loop can also
+  // re-substitute inside an already-emitted value ("July" → "Ju1y").
+  const pattern = new RegExp(
+    Object.keys(tokens)
+      .sort((a, b) => b.length - a.length)
+      .join('|'),
+    'g',
+  );
 
-  return result;
+  return format.replace(pattern, (token) => tokens[token]);
 }
 
 /**

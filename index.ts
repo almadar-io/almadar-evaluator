@@ -49,5 +49,8 @@ export {
   executeEffects,
 } from './SExpressionEvaluator.js';
 
+// Listen-route `with { ... }` mapping evaluation (payload-only context)
+export { evaluateListenPayloadExpr } from './listen-payload.js';
+
 // Operators (for advanced use cases)
 export * from './operators/index.js';

@@ -592,6 +592,14 @@ describe('StdLibraryEvaluator', () => {
       expect(evaluate(['time/format', timestamp, 'YYYY-MM-DD'], ctx)).toBe('2024-01-18');
     });
 
+    it('time/format prefers the longest matching token', () => {
+      const timestamp = new Date('2024-07-08T09:05:00').getTime();
+      expect(evaluate(['time/format', timestamp, 'MMM D, YYYY'], ctx)).toBe('Jul 8, 2024');
+      expect(evaluate(['time/format', timestamp, 'MMMM D'], ctx)).toBe('July 8');
+      expect(evaluate(['time/format', timestamp, 'dddd'], ctx)).toBe('Monday');
+      expect(evaluate(['time/format', timestamp, 'ddd HH:mm'], ctx)).toBe('Mon 09:05');
+    });
+
     it('time/year extracts year', () => {
       const timestamp = new Date('2024-01-18').getTime();
       expect(evaluate(['time/year', timestamp], ctx)).toBe(2024);

@@ -760,3 +760,86 @@ export function evalArrayDropLast(
   const n = evaluate(args[1], ctx) as number;
   return (arr ?? []).slice(0, -n);
 }
+
+/**
+ * Cosine similarity, agreeing numerically with @almadar/llm's
+ * embedding-client.ts `cosineSimilarity` on well-formed input. Diverges on
+ * malformed input: length mismatch, an empty vector, or a zero-magnitude
+ * vector all throw instead of returning 0 — 0 is a legitimate orthogonal
+ * result and must stay distinguishable from a malformed-input failure.
+ */
+function cosineSimilarity(a: readonly number[], b: readonly number[]): number {
+  if (a.length !== b.length) {
+    throw new Error(`array/cosine: vector length mismatch (${a.length} vs ${b.length})`);
+  }
+  if (a.length === 0) {
+    throw new Error('array/cosine: empty vector has no defined similarity');
+  }
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    const av = a[i];
+    const bv = b[i];
+    dot += av * bv;
+    normA += av * av;
+    normB += bv * bv;
+  }
+  if (normA === 0 || normB === 0) {
+    throw new Error('array/cosine: zero-magnitude vector has no defined direction to compare');
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+/**
+ * array/cosine - Cosine similarity between two numeric arrays. Pure math,
+ * no side effects, no ctx.llm dependency — works on arrays the caller
+ * already has (e.g. embeddings from llm/embed).
+ */
+export function evalArrayCosine(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  const a = evaluate(args[0], ctx) as number[];
+  const b = evaluate(args[1], ctx) as number[];
+  return cosineSimilarity(a, b);
+}
+
+/**
+ * array/nearest - Best-matching candidate by cosine similarity, plus the
+ * margin (best score minus runner-up score) that gates abstention. With a
+ * single candidate there is no runner-up to establish a margin against, so
+ * margin is defined as 0 — that forces a margin-gate to abstain rather than
+ * fabricate confidence from a comparison that was never actually made.
+ */
+export function evalArrayNearest(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): { index: number; score: number; margin: number } {
+  const query = evaluate(args[0], ctx) as number[];
+  const candidates = evaluate(args[1], ctx) as number[][];
+  if (candidates.length === 0) {
+    throw new Error('array/nearest: candidates array is empty, no nearest match exists');
+  }
+  const scores = candidates.map((c) => cosineSimilarity(query, c));
+
+  let bestIdx = 0;
+  let bestScore = scores[0];
+  for (let i = 1; i < scores.length; i++) {
+    if (scores[i] > bestScore) {
+      bestScore = scores[i];
+      bestIdx = i;
+    }
+  }
+
+  let secondBest = -Infinity;
+  for (let i = 0; i < scores.length; i++) {
+    if (i === bestIdx) continue;
+    if (scores[i] > secondBest) secondBest = scores[i];
+  }
+
+  const margin = scores.length === 1 ? 0 : bestScore - secondBest;
+  return { index: bestIdx, score: bestScore, margin };
+}

@@ -84,6 +84,9 @@ import * as stdFormat from './std/format.js';
 import * as stdAsync from './std/async.js';
 import * as stdProb from './std/prob.js';
 import * as stdOs from './std/os.js';
+import * as stdContract from './std/contract.js';
+import * as stdGraph from './std/graph.js';
+import * as stdData from './std/data.js';
 import * as stdLlm from './std/llm.js';
 import * as stdWorkspace from './std/workspace.js';
 import * as stdSession from './std/session.js';
@@ -730,6 +733,10 @@ export class SExpressionEvaluator {
         return stdArray.evalArrayTakeLast(args, evaluate, ctx);
       case 'array/dropLast':
         return stdArray.evalArrayDropLast(args, evaluate, ctx);
+      case 'array/cosine':
+        return stdArray.evalArrayCosine(args, evaluate, ctx);
+      case 'array/nearest':
+        return stdArray.evalArrayNearest(args, evaluate, ctx);
 
       // ===============================
       // Standard Library: object/*
@@ -1032,6 +1039,45 @@ export class SExpressionEvaluator {
       case 'integration/http':                return stdIntegration.evalIntegrationHttp(args, evaluate, ctx);
       case 'integration/github-get-repo':     return stdIntegration.evalIntegrationGithubGetRepo(args, evaluate, ctx);
       case 'integration/github-create-issue': return stdIntegration.evalIntegrationGithubCreateIssue(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: contract/*
+      // ===============================
+      case 'contract/validate-input':    return stdContract.evalContractValidateInput(args, evaluate, ctx);
+      case 'contract/validate-output':   return stdContract.evalContractValidateOutput(args, evaluate, ctx);
+      case 'contract/clamp-output':      return stdContract.evalContractClampOutput(args, evaluate, ctx);
+      case 'contract/violations':        return stdContract.evalContractViolations(args, evaluate, ctx);
+      case 'contract/entity-to-tensor':  return stdContract.evalContractEntityToTensor(args, evaluate, ctx);
+      case 'contract/tensor-to-payload': return stdContract.evalContractTensorToPayload(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: graph/*
+      // ===============================
+      case 'graph/from-entities':    return stdGraph.evalGraphFromEntities(args, evaluate, ctx);
+      case 'graph/from-adjacency':   return stdGraph.evalGraphFromAdjacency(args, evaluate, ctx);
+      case 'graph/from-edge-list':   return stdGraph.evalGraphFromEdgeList(args, evaluate, ctx);
+      case 'graph/add-self-loops':   return stdGraph.evalGraphAddSelfLoops(args, evaluate, ctx);
+      case 'graph/to-undirected':    return stdGraph.evalGraphToUndirected(args, evaluate, ctx);
+      case 'graph/subgraph':         return stdGraph.evalGraphSubgraph(args, evaluate, ctx);
+      case 'graph/k-hop':            return stdGraph.evalGraphKHop(args, evaluate, ctx);
+      case 'graph/node-features':    return stdGraph.evalGraphNodeFeatures(args, evaluate, ctx);
+      case 'graph/edge-index':       return stdGraph.evalGraphEdgeIndex(args, evaluate, ctx);
+      case 'graph/edge-features':    return stdGraph.evalGraphEdgeFeatures(args, evaluate, ctx);
+      case 'graph/num-nodes':        return stdGraph.evalGraphNumNodes(args, evaluate, ctx);
+      case 'graph/num-edges':        return stdGraph.evalGraphNumEdges(args, evaluate, ctx);
+      case 'graph/degree':           return stdGraph.evalGraphDegree(args, evaluate, ctx);
+      case 'graph/batch':            return stdGraph.evalGraphBatch(args, evaluate, ctx);
+
+      // ===============================
+      // Standard Library: data/*
+      // ===============================
+      case 'data/dataset':    return stdData.evalDataDataset(args, evaluate, ctx);
+      case 'data/dataloader': return stdData.evalDataDataloader(args, evaluate, ctx);
+      case 'data/split':      return stdData.evalDataSplit(args, evaluate, ctx);
+      case 'data/normalize':  return stdData.evalDataNormalize(args, evaluate, ctx);
+      case 'data/augment':    return stdData.evalDataAugment(args, evaluate, ctx);
+      case 'data/tokenize':   return stdData.evalDataTokenize(args, evaluate, ctx);
+      case 'data/pad':        return stdData.evalDataPad(args, evaluate, ctx);
 
       default:
         return UNKNOWN_OPERATOR;
