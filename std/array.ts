@@ -11,6 +11,7 @@ import type { SExpr } from '../types/expression.js';
 import type { EvaluationContext } from '../context.js';
 import { createChildContext } from '../context.js';
 import { isSExpr, getOperator, getArgs } from '../types/expression.js';
+import type { RuntimeValue } from '@almadar/core';
 
 type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
@@ -64,7 +65,7 @@ function evalWithItem(
   }
 
   const childCtx = createChildContext(ctx, locals);
-  let result = evaluate(expr, childCtx);
+  let result = evaluate(expr, childCtx) as RuntimeValue;
   // Re-evaluate when the immediate result is itself an SExpression. The
   // canonical case is std-stats's per-metric filter: the lolo lambda
   // dereferences `(object/get @metric "filter" true)` which returns the
@@ -73,13 +74,13 @@ function evalWithItem(
   // re-eval recurses through fn-form via the operator branch above so
   // `["fn", "row", body]` predicates bind @row=item correctly.
   if (isSExpr(result)) {
-    result = evalWithItem(result as SExpr, evaluate, childCtx, item, index);
+    result = evalWithItem(result as SExpr, evaluate, childCtx, item, index) as RuntimeValue;
   } else if (typeof result === 'function') {
     // The literal-object reduction pass already dispatched the stored
     // `["fn", …]` to an evalFn closure (config literals are evaluated once
     // wholesale), so apply the closure per evalFn's `(item, evaluate, ctx)`
     // contract instead of returning it as a truthy predicate.
-    result = (result as (item: unknown, evaluate: EvalFn, ctx: EvaluationContext) => unknown)(item, evaluate, childCtx);
+    result = (result as (item: unknown, evaluate: EvalFn, ctx: EvaluationContext) => RuntimeValue)(item, evaluate, childCtx);
   }
   return result;
 }

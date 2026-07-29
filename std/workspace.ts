@@ -10,6 +10,7 @@
 import type { SExpr } from '../types/expression.js';
 import type { EvaluationContext } from '../context.js';
 import { isOrbital, isOrbitalSchemaValue, isPlanSnapshot } from './substrate-guards.js';
+import type { RuntimeValue } from '@almadar/core';
 
 type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
@@ -22,7 +23,7 @@ export function evalWorkspaceReadOrbital(args: SExpr[], evaluate: EvalFn, ctx: E
 export function evalWorkspaceWriteOrbital(args: SExpr[], evaluate: EvalFn, ctx: EvaluationContext): Promise<void> | null {
   if (!ctx.workspace) return null;
   const name = evaluate(args[0], ctx) as string;
-  const content = evaluate(args[1], ctx);
+  const content = evaluate(args[1], ctx) as RuntimeValue;
   if (!isOrbital(content)) {
     throw new Error(`workspace/write-orbital value for "${name}" is not a valid orbital definition`);
   }
@@ -60,7 +61,7 @@ export function evalWorkspaceReadSchema(_args: SExpr[], _evaluate: EvalFn, ctx: 
 
 export function evalWorkspaceWriteSchema(args: SExpr[], evaluate: EvalFn, ctx: EvaluationContext): Promise<void> | null {
   if (!ctx.workspace) return null;
-  const schema = evaluate(args[0], ctx);
+  const schema = evaluate(args[0], ctx) as RuntimeValue;
   if (!isOrbitalSchemaValue(schema)) {
     throw new Error('workspace/write-schema value is not a valid orbital schema');
   }
@@ -74,7 +75,7 @@ export function evalWorkspaceReadPlan(_args: SExpr[], _evaluate: EvalFn, ctx: Ev
 
 export function evalWorkspaceWritePlan(args: SExpr[], evaluate: EvalFn, ctx: EvaluationContext): Promise<void> | null {
   if (!ctx.workspace) return null;
-  const plan = evaluate(args[0], ctx);
+  const plan = evaluate(args[0], ctx) as RuntimeValue;
   if (!isPlanSnapshot(plan)) {
     throw new Error('workspace/write-plan value is not a valid plan snapshot (schemaVersion 1 envelope)');
   }

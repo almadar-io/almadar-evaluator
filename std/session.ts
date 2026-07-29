@@ -9,7 +9,7 @@
 
 import type { SExpr } from '../types/expression.js';
 import type { EvaluationContext } from '../context.js';
-import type { AgentMemoryRecord } from '@almadar/core';
+import type { AgentMemoryRecord, RuntimeValue } from '@almadar/core';
 import { isOrbital, isSessionHistoryEntry } from './substrate-guards.js';
 
 type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
@@ -23,7 +23,7 @@ export function evalSessionReadSpec(args: SExpr[], evaluate: EvalFn, ctx: Evalua
 export function evalSessionWriteSpec(args: SExpr[], evaluate: EvalFn, ctx: EvaluationContext): Promise<void> | null {
   if (!ctx.session) return null;
   const orbitalName = evaluate(args[0], ctx) as string;
-  const spec = evaluate(args[1], ctx);
+  const spec = evaluate(args[1], ctx) as RuntimeValue;
   if (!isOrbital(spec)) {
     throw new Error(`session/write-spec value for "${orbitalName}" is not a valid orbital definition`);
   }
@@ -52,7 +52,7 @@ export function evalSessionReadHistory(args: SExpr[], evaluate: EvalFn, ctx: Eva
 export function evalSessionAppendHistory(args: SExpr[], evaluate: EvalFn, ctx: EvaluationContext): Promise<void> | null {
   if (!ctx.session) return null;
   const orbitalName = evaluate(args[0], ctx) as string;
-  const entry = evaluate(args[1], ctx);
+  const entry = evaluate(args[1], ctx) as RuntimeValue;
   if (!isSessionHistoryEntry(entry)) {
     throw new Error(`session/append-history entry for "${orbitalName}" must have role/content/timestamp`);
   }

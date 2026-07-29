@@ -16,9 +16,9 @@
  * @packageDocumentation
  */
 
-import type { ListenPayloadEvaluator } from '@almadar/core';
+import type { ListenPayloadEvaluator, RuntimeValue } from '@almadar/core';
 import { createMinimalContext } from './context.js';
 import { evaluate } from './SExpressionEvaluator.js';
 
 export const evaluateListenPayloadExpr: ListenPayloadEvaluator = (expr, payload) =>
-  evaluate(expr, createMinimalContext({}, payload));
+  evaluate(expr, createMinimalContext({}, payload)) as RuntimeValue;

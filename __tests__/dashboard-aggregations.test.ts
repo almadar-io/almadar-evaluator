@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import type { SExpr } from '@almadar/core';
 import { evaluate, evaluator } from '../SExpressionEvaluator.js';
 import { createMinimalContext } from '../context.js';
 import type { EvaluationContext } from '../context.js';
@@ -39,7 +40,7 @@ describe('Dashboard aggregations', () => {
   it('std-stats: array/map over @config.metrics with chained-if dispatch', () => {
     // Mirrors std-stats's `(set @entity.cards (array/map @config.metrics
     // ["fn", "metric", { label: ..., value: (if ... ...) }]))` shape.
-    const metrics = [
+    const metrics: SExpr = [
       { aggregation: 'count', label: 'Total Items',   icon: 'list',         variant: 'primary',                   format: 'number' },
       { aggregation: 'count', label: 'Active',        icon: 'check-circle', variant: 'success',                   format: 'number' },
       { aggregation: 'sum',   label: 'Total Revenue', icon: 'dollar-sign',  variant: 'info',     field: 'amount', format: 'currency' },
@@ -75,7 +76,7 @@ describe('Dashboard aggregations', () => {
     // `.filter(arrayValue)` which TypeErrors at runtime in the codegen
     // path). Lets one metrics array yield "Total: 6" alongside
     // "Active: 5" without a separate fetch.
-    const metrics = [
+    const metrics: SExpr = [
       { aggregation: 'count', label: 'Total' },                                                            // no filter → all rows
       { aggregation: 'count', label: 'Active',        filterField: 'status', filterValue: 'active' },
       { aggregation: 'sum',   label: 'ActiveRevenue', field: 'amount', filterField: 'status', filterValue: 'active' },

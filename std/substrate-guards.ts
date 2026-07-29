@@ -15,6 +15,7 @@ import {
   safeParseOrbitalSchema,
   type Orbital,
   type OrbitalSchema,
+  type RuntimeValue,
 } from '@almadar/core';
 
 export {
@@ -25,11 +26,11 @@ export {
 } from '@almadar/core';
 
 /** Deep zod validation bridging to core's hand-written `Orbital` interface. */
-export function isOrbital(value: unknown): value is Orbital {
+export function isOrbital(value: RuntimeValue): value is Orbital {
   return OrbitalZodSchema.safeParse(value).success;
 }
 
 /** Deep zod validation bridging to core's hand-written `OrbitalSchema` interface. */
-export function isOrbitalSchemaValue(value: unknown): value is OrbitalSchema {
+export function isOrbitalSchemaValue(value: RuntimeValue): value is OrbitalSchema {
   return safeParseOrbitalSchema(value).success;
 }
