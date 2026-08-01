@@ -21,6 +21,149 @@ const MS_PER_DAY = 24 * MS_PER_HOUR;
 const MS_PER_WEEK = 7 * MS_PER_DAY;
 
 /**
+ * The one time-unit vocabulary, mirroring `TimeUnit::parse` in
+ * `orbital-rust/crates/orbital-core/src/evaluator/operators/system.rs`. The two
+ * execution paths diverged silently once already
+ * (`S-CALENDAR-RANGE-FILTER-USES-UNSUPPORTED-TIME-UNITS`): this path accepted
+ * `month`/`year` while the Rust path threw on them, and this path silently
+ * no-opped on `d`/`w` while the Rust path accepted them. Any edit here must land
+ * in `system.rs` in the same change.
+ */
+const TIME_UNIT_ALIASES: Readonly<Record<string, TimeUnit>> = {
+  ms: 'ms',
+  millisecond: 'ms',
+  milliseconds: 'ms',
+  s: 'second',
+  second: 'second',
+  seconds: 'second',
+  m: 'minute',
+  minute: 'minute',
+  minutes: 'minute',
+  h: 'hour',
+  hour: 'hour',
+  hours: 'hour',
+  d: 'day',
+  day: 'day',
+  days: 'day',
+  w: 'week',
+  week: 'week',
+  weeks: 'week',
+  month: 'month',
+  months: 'month',
+  year: 'year',
+  years: 'year',
+};
+
+const TIME_UNIT_VOCABULARY =
+  'ms|millisecond(s), s|second(s), m|minute(s), h|hour(s), d|day(s), w|week(s), month(s), year(s)';
+
+/**
+ * Resolve a unit literal, throwing on anything outside the vocabulary. An
+ * unknown unit used to fall through a `switch` and silently return the input
+ * unchanged, which is how a wrong date range shipped undetected.
+ */
+function parseTimeUnit(unit: unknown): TimeUnit {
+  const resolved = TIME_UNIT_ALIASES[String(unit)];
+  if (resolved === undefined) {
+    throw new TypeError(
+      `Type mismatch: expected time unit (${TIME_UNIT_VOCABULARY}), got ${String(unit)}`
+    );
+  }
+  return resolved;
+}
+
+/** Fixed-length units in ms. `month`/`year` have no fixed length. */
+const FIXED_UNIT_MS: Readonly<Partial<Record<TimeUnit, number>>> = {
+  ms: 1,
+  second: MS_PER_SECOND,
+  minute: MS_PER_MINUTE,
+  hour: MS_PER_HOUR,
+  day: MS_PER_DAY,
+  week: MS_PER_WEEK,
+};
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+}
+
+/**
+ * Calendar-correct month shift, in UTC so the result never depends on the host
+ * timezone. The day-of-month **clamps** into the target month (31 Mar − 1 month
+ * = 28/29 Feb) rather than overflowing into the next one, which is what
+ * `Date.prototype.setMonth` would do. `add_calendar_months` in `system.rs`
+ * clamps identically.
+ */
+function addCalendarMonths(ts: number, months: number): number {
+  const date = new Date(ts);
+  const y = date.getUTCFullYear();
+  const m = date.getUTCMonth();
+  const total = y * 12 + m + months;
+  const ny = Math.floor(total / 12);
+  const nm = ((total % 12) + 12) % 12;
+  const nd = Math.min(date.getUTCDate(), daysInMonth(ny, nm));
+  const shifted = new Date(ts);
+  shifted.setUTCFullYear(ny, nm, nd);
+  return shifted.getTime();
+}
+
+/** Shift `ts` by `amount` of `unit`. Behind both time/add and time/subtract. */
+function shiftTime(ts: number, amount: number, unit: TimeUnit): number {
+  const fixed = FIXED_UNIT_MS[unit];
+  if (fixed !== undefined) return ts + amount * fixed;
+  return addCalendarMonths(ts, unit === 'year' ? Math.trunc(amount) * 12 : Math.trunc(amount));
+}
+
+/**
+ * Start of the unit-bucket containing `ts`. Behind both time/startOf and
+ * time/isSame. Weeks start **Monday** (ISO-8601), matching `start_of` in
+ * `system.rs`; this path used to start weeks on Sunday.
+ */
+function startOf(ts: number, unit: TimeUnit): number {
+  switch (unit) {
+    case 'ms':
+      return Math.floor(ts);
+    case 'second':
+      return Math.floor(ts / MS_PER_SECOND) * MS_PER_SECOND;
+    case 'minute':
+      return Math.floor(ts / MS_PER_MINUTE) * MS_PER_MINUTE;
+    case 'hour':
+      return Math.floor(ts / MS_PER_HOUR) * MS_PER_HOUR;
+    case 'day':
+      return Math.floor(ts / MS_PER_DAY) * MS_PER_DAY;
+    case 'week': {
+      const days = Math.floor(ts / MS_PER_DAY);
+      const dow = (((days + 3) % 7) + 7) % 7; // Jan 1 1970 = Thu; 0 => Monday
+      return (days - dow) * MS_PER_DAY;
+    }
+    case 'month': {
+      const d = new Date(ts);
+      return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+    }
+    case 'year':
+      return Date.UTC(new Date(ts).getUTCFullYear(), 0, 1);
+  }
+}
+
+/**
+ * Signed count of **whole** calendar months from `from` to `to`. A partial
+ * trailing month does not count, so 31 Jan → 28 Feb is 0 months. Mirrors
+ * `whole_months_between`; this path used a 30.44-day approximation.
+ */
+function wholeMonthsBetween(from: number, to: number): number {
+  const lo = new Date(Math.min(from, to));
+  const hi = new Date(Math.max(from, to));
+  let months =
+    (hi.getUTCFullYear() - lo.getUTCFullYear()) * 12 + (hi.getUTCMonth() - lo.getUTCMonth());
+
+  const loRest: [number, number] = [lo.getUTCDate(), lo.getTime() - startOf(lo.getTime(), 'day')];
+  const hiRest: [number, number] = [hi.getUTCDate(), hi.getTime() - startOf(hi.getTime(), 'day')];
+  if (hiRest[0] < loRest[0] || (hiRest[0] === loRest[0] && hiRest[1] < loRest[1])) {
+    months -= 1;
+  }
+  return to < from ? -months : months;
+}
+
+/**
  * time/now - Current timestamp
  */
 export function evalTimeNow(): number {
@@ -199,42 +342,6 @@ export function evalTimeSecond(
 }
 
 /**
- * Helper to add time to a date
- */
-function addTime(date: Date, amount: number, unit: TimeUnit): Date {
-  const result = new Date(date);
-
-  switch (unit) {
-    case 'year':
-      result.setFullYear(result.getFullYear() + amount);
-      break;
-    case 'month':
-      result.setMonth(result.getMonth() + amount);
-      break;
-    case 'week':
-      result.setDate(result.getDate() + amount * 7);
-      break;
-    case 'day':
-      result.setDate(result.getDate() + amount);
-      break;
-    case 'hour':
-      result.setHours(result.getHours() + amount);
-      break;
-    case 'minute':
-      result.setMinutes(result.getMinutes() + amount);
-      break;
-    case 'second':
-      result.setSeconds(result.getSeconds() + amount);
-      break;
-    case 'ms':
-      result.setMilliseconds(result.getMilliseconds() + amount);
-      break;
-  }
-
-  return result;
-}
-
-/**
  * time/add - Add time to timestamp
  */
 export function evalTimeAdd(
@@ -244,10 +351,9 @@ export function evalTimeAdd(
 ): number {
   const timestamp = evaluate(args[0], ctx) as number;
   const amount = evaluate(args[1], ctx) as number;
-  const unit = evaluate(args[2], ctx) as TimeUnit;
+  const unit = parseTimeUnit(evaluate(args[2], ctx));
 
-  const date = new Date(timestamp);
-  return addTime(date, amount, unit).getTime();
+  return shiftTime(timestamp, amount, unit);
 }
 
 /**
@@ -260,10 +366,9 @@ export function evalTimeSubtract(
 ): number {
   const timestamp = evaluate(args[0], ctx) as number;
   const amount = evaluate(args[1], ctx) as number;
-  const unit = evaluate(args[2], ctx) as TimeUnit;
+  const unit = parseTimeUnit(evaluate(args[2], ctx));
 
-  const date = new Date(timestamp);
-  return addTime(date, -amount, unit).getTime();
+  return shiftTime(timestamp, -amount, unit);
 }
 
 /**
@@ -276,29 +381,17 @@ export function evalTimeDiff(
 ): number {
   const a = evaluate(args[0], ctx) as number;
   const b = evaluate(args[1], ctx) as number;
-  const unit = args.length > 2 ? (evaluate(args[2], ctx) as TimeUnit) : 'ms';
-
+  // Signed, so that diff(a, b) == -diff(b, a). Whole units truncate toward
+  // zero for the same reason.
   const diffMs = a - b;
+  if (args.length <= 2) return diffMs;
 
-  switch (unit) {
-    case 'year':
-      return Math.floor(diffMs / (MS_PER_DAY * 365.25));
-    case 'month':
-      return Math.floor(diffMs / (MS_PER_DAY * 30.44));
-    case 'week':
-      return Math.floor(diffMs / MS_PER_WEEK);
-    case 'day':
-      return Math.floor(diffMs / MS_PER_DAY);
-    case 'hour':
-      return Math.floor(diffMs / MS_PER_HOUR);
-    case 'minute':
-      return Math.floor(diffMs / MS_PER_MINUTE);
-    case 'second':
-      return Math.floor(diffMs / MS_PER_SECOND);
-    case 'ms':
-    default:
-      return diffMs;
-  }
+  const unit = parseTimeUnit(evaluate(args[2], ctx));
+  const fixed = FIXED_UNIT_MS[unit];
+  if (fixed !== undefined) return Math.trunc(diffMs / fixed);
+
+  const months = wholeMonthsBetween(b, a);
+  return unit === 'year' ? Math.trunc(months / 12) : months;
 }
 
 /**
@@ -310,37 +403,9 @@ export function evalTimeStartOf(
   ctx: EvaluationContext
 ): number {
   const timestamp = evaluate(args[0], ctx) as number;
-  const unit = evaluate(args[1], ctx) as TimeUnit;
+  const unit = parseTimeUnit(evaluate(args[1], ctx));
 
-  const date = new Date(timestamp);
-
-  switch (unit) {
-    case 'year':
-      date.setMonth(0, 1);
-      date.setHours(0, 0, 0, 0);
-      break;
-    case 'month':
-      date.setDate(1);
-      date.setHours(0, 0, 0, 0);
-      break;
-    case 'week': {
-      const day = date.getDay();
-      date.setDate(date.getDate() - day);
-      date.setHours(0, 0, 0, 0);
-      break;
-    }
-    case 'day':
-      date.setHours(0, 0, 0, 0);
-      break;
-    case 'hour':
-      date.setMinutes(0, 0, 0);
-      break;
-    case 'minute':
-      date.setSeconds(0, 0);
-      break;
-  }
-
-  return date.getTime();
+  return startOf(timestamp, unit);
 }
 
 /**
@@ -352,37 +417,11 @@ export function evalTimeEndOf(
   ctx: EvaluationContext
 ): number {
   const timestamp = evaluate(args[0], ctx) as number;
-  const unit = evaluate(args[1], ctx) as TimeUnit;
+  const unit = parseTimeUnit(evaluate(args[1], ctx));
 
-  const date = new Date(timestamp);
-
-  switch (unit) {
-    case 'year':
-      date.setMonth(11, 31);
-      date.setHours(23, 59, 59, 999);
-      break;
-    case 'month':
-      date.setMonth(date.getMonth() + 1, 0);
-      date.setHours(23, 59, 59, 999);
-      break;
-    case 'week': {
-      const day = date.getDay();
-      date.setDate(date.getDate() + (6 - day));
-      date.setHours(23, 59, 59, 999);
-      break;
-    }
-    case 'day':
-      date.setHours(23, 59, 59, 999);
-      break;
-    case 'hour':
-      date.setMinutes(59, 59, 999);
-      break;
-    case 'minute':
-      date.setSeconds(59, 999);
-      break;
-  }
-
-  return date.getTime();
+  // Last millisecond of the bucket = start of the next bucket, minus one.
+  if (unit === 'ms') return Math.floor(timestamp);
+  return shiftTime(startOf(timestamp, unit), 1, unit) - 1;
 }
 
 /**
@@ -435,42 +474,15 @@ export function evalTimeIsSame(
 ): boolean {
   const a = evaluate(args[0], ctx) as number;
   const b = evaluate(args[1], ctx) as number;
-  const unit = args.length > 2 ? (evaluate(args[2], ctx) as TimeUnit) : undefined;
-
-  if (!unit) {
+  if (args.length <= 2) {
     return a === b;
   }
 
-  const dateA = new Date(a);
-  const dateB = new Date(b);
-
-  switch (unit) {
-    case 'year':
-      return dateA.getFullYear() === dateB.getFullYear();
-    case 'month':
-      return (
-        dateA.getFullYear() === dateB.getFullYear() && dateA.getMonth() === dateB.getMonth()
-      );
-    case 'day':
-      return (
-        dateA.getFullYear() === dateB.getFullYear() &&
-        dateA.getMonth() === dateB.getMonth() &&
-        dateA.getDate() === dateB.getDate()
-      );
-    case 'hour':
-      return (
-        dateA.getFullYear() === dateB.getFullYear() &&
-        dateA.getMonth() === dateB.getMonth() &&
-        dateA.getDate() === dateB.getDate() &&
-        dateA.getHours() === dateB.getHours()
-      );
-    case 'minute':
-      return Math.floor(a / MS_PER_MINUTE) === Math.floor(b / MS_PER_MINUTE);
-    case 'second':
-      return Math.floor(a / MS_PER_SECOND) === Math.floor(b / MS_PER_SECOND);
-    default:
-      return a === b;
-  }
+  // Same unit-bucket, i.e. startOf(a, unit) === startOf(b, unit). Defined in
+  // terms of `startOf` so week/month/year cannot drift back to an exact
+  // millisecond comparison.
+  const unit = parseTimeUnit(evaluate(args[2], ctx));
+  return startOf(a, unit) === startOf(b, unit);
 }
 
 /**
