@@ -7,7 +7,7 @@
  * @packageDocumentation
  */
 
-import type { AgentContext, LlmContext, WorkspaceContext, SessionContext, MemoryContext, TraceContext, IntegrationContext, TraitConfig } from '@almadar/core';
+import type { AgentContext, LlmContext, WorkspaceContext, SessionContext, MemoryContext, TraceContext, IntegrationContext, TraitConfig, NavItem } from '@almadar/core';
 
 /**
  * User context for `@user` bindings — owned by `@almadar/core` so the
@@ -49,6 +49,25 @@ export interface EvaluationContext {
    * trait ref; the atom's render-ui reads `@config.icon`, `@config.title`, etc.
    */
   config?: TraitConfig;
+
+  /**
+   * The host orbital's pages as a `NavItem[]` for the `@pages` render sigil
+   * (`href = page.path`, `label = page.name`). Seeded into the render binding
+   * context only — never present on a guard context (`createMinimalContext`),
+   * so the sigil is render-resolved exactly like the compiler's
+   * `OirBindingRoot::Pages`. Mirrors `@currentTheme` / the compiler's
+   * post-pass substitution in `resolve_to_oir`.
+   */
+  pages?: NavItem[];
+
+  /**
+   * The `data-theme` selector-key string for the `@currentTheme` render sigil,
+   * derived from the host orbital's `Orbital.theme` (a `ThemeRef` name).
+   * Render-resolved only (never on a guard context). The knob that consumes
+   * it stays `string` — the renderer applies the theme via the `data-theme`
+   * attribute + CSS `[data-theme="..."]` blocks.
+   */
+  currentTheme?: string;
 
   /**
    * When true, log warnings when bindings resolve to undefined. (RCG-01)
@@ -257,6 +276,15 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): unknown
         // render-ui reads `@config.icon`, `@config.title`, etc.
         value = ctx.config;
         break;
+      case 'pages':
+        // Render-resolved schema sigil — the host orbital's pages as
+        // `NavItem[]`. Bare root (no path); seeded onto the render binding
+        // context only.
+        return ctx.pages;
+      case 'currentTheme':
+        // Render-resolved schema sigil — the `data-theme` key string derived
+        // from `Orbital.theme`. Bare root (no path); render-context only.
+        return ctx.currentTheme;
       default:
         // Singleton entity reference (@EntityName.field)
         value = ctx.singletons.get(root);
