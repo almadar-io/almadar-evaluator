@@ -528,6 +528,15 @@ export function evalArrayReduce(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown {
+  if (
+    isSExpr(args[1]) &&
+    getOperator(args[1]) === 'fn' &&
+    !(isSExpr(args[2]) && getOperator(args[2]) === 'fn')
+  ) {
+    throw new Error(
+      '(array/reduce …): the reducer lambda goes at argument 3 — (array/reduce arr init (fn (acc x) …)) — same order the compiled path enforces (SEXPR_LAMBDA_ARG_POSITION)'
+    );
+  }
   const arr = evaluate(args[0], ctx) as unknown[];
   const init = evaluate(args[1], ctx);
   const reducerExpr = args[2];
