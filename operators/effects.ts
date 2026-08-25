@@ -7,10 +7,9 @@
  */
 
 import type { SExpr } from '../types/expression.js';
-import type { EvaluationContext } from '../context.js';
+import type { EvaluationContext, Evaluator } from '../context.js';
+import type { RuntimeValue } from '@almadar/core';
 import { resolveBinding } from '../context.js';
-
-type Evaluator = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
 /**
  * Evaluate set: ["set", "@entity.field", value] or ["set", "@entity.field", value, operation]
@@ -106,17 +105,17 @@ export function evalPersist(args: SExpr[], evaluate: Evaluator, ctx: EvaluationC
       if (!Array.isArray(op)) return op;
       return (op as SExpr[]).map((item) => evaluate(item, ctx));
     });
-    ctx.persist('batch', { operations } as Record<string, unknown>).catch((err) => {
+    ctx.persist('batch', { operations }).catch((err) => {
       console.error('Persist batch failed:', err);
     });
     return;
   }
 
   // Single operation mode
-  const data = args.length > 1 ? (evaluate(args[1], ctx) as Record<string, unknown>) : ctx.payload;
+  const data = args.length > 1 ? (evaluate(args[1], ctx) as Record<string, RuntimeValue>) : ctx.payload;
 
   // Fire and forget (async)
-  ctx.persist(action, data as Record<string, unknown>).catch((err) => {
+  ctx.persist(action, data).catch((err) => {
     console.error(`Persist ${action} failed:`, err);
   });
 }
@@ -126,7 +125,7 @@ export function evalPersist(args: SExpr[], evaluate: Evaluator, ctx: EvaluationC
  */
 export function evalNavigate(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): void {
   const route = args[0] as string;
-  const params = args.length > 1 ? (evaluate(args[1], ctx) as Record<string, unknown>) : undefined;
+  const params = args.length > 1 ? (evaluate(args[1], ctx) as Record<string, RuntimeValue>) : undefined;
 
   if (!ctx.navigate) {
     console.warn('No navigate handler in context for navigate effect');
@@ -156,7 +155,7 @@ export function evalNotify(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCo
  */
 export function evalSpawn(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): void {
   const entityType = args[0] as string;
-  const props = args.length > 1 ? (evaluate(args[1], ctx) as Record<string, unknown>) : undefined;
+  const props = args.length > 1 ? (evaluate(args[1], ctx) as Record<string, RuntimeValue>) : undefined;
 
   if (!ctx.spawn) {
     console.warn('No spawn handler in context for spawn effect');
@@ -186,7 +185,7 @@ export function evalDespawn(args: SExpr[], evaluate: Evaluator, ctx: EvaluationC
 export function evalCallService(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): void {
   const service = args[0] as string;
   const method = args[1] as string;
-  const params = args.length > 2 ? (evaluate(args[2], ctx) as Record<string, unknown>) : undefined;
+  const params = args.length > 2 ? (evaluate(args[2], ctx) as Record<string, RuntimeValue>) : undefined;
 
   if (!ctx.callService) {
     console.warn('No callService handler in context for call-service effect');
@@ -204,25 +203,25 @@ export function evalCallService(args: SExpr[], evaluate: Evaluator, ctx: Evaluat
  * This handles computed props like { label: ["str/concat", "Score: ", "@entity.score"] }
  */
 function evaluateNestedProps(
-  obj: Record<string, unknown>,
+  obj: Record<string, RuntimeValue>,
   evaluate: Evaluator,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  
+): Record<string, RuntimeValue> {
+  const result: Record<string, RuntimeValue> = {};
+
   for (const [key, value] of Object.entries(obj)) {
     if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
       // This looks like an s-expression, evaluate it
       result[key] = evaluate(value as SExpr, ctx);
     } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       // Nested object, recurse
-      result[key] = evaluateNestedProps(value as Record<string, unknown>, evaluate, ctx);
+      result[key] = evaluateNestedProps(value as Record<string, RuntimeValue>, evaluate, ctx);
     } else {
       // Primitive value or plain array, keep as-is
       result[key] = value;
     }
   }
-  
+
   return result;
 }
 
@@ -236,7 +235,7 @@ function evaluateNestedProps(
 export function evalRenderUI(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): void {
   const slot = args[0] as string;
   const pattern = evaluate(args[1], ctx);
-  const rawProps = args.length > 2 ? (args[2] as Record<string, unknown>) : undefined;
+  const rawProps = args.length > 2 ? (args[2] as Record<string, RuntimeValue>) : undefined;
   const priority = args.length > 3 ? (evaluate(args[3], ctx) as number) : undefined;
 
   if (!ctx.renderUI) {
@@ -333,7 +332,7 @@ export function evalDecrement(args: SExpr[], evaluate: Evaluator, ctx: Evaluatio
  * Evaluate ref: ["ref", "EntityType"] or ["ref", "EntityType", { filter, include }]
  * Server-side: queries entity data. Client-side: subscribes to EntityStore.
  */
-export function evalRef(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+export function evalRef(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
   const entityType = args[0] as string;
   if (ctx.effectHandlers?.ref) {
     return ctx.effectHandlers.ref(entityType, args.length > 1 ? evaluate(args[1], ctx) : undefined);
@@ -349,7 +348,7 @@ export function evalRef(args: SExpr[], evaluate: Evaluator, ctx: EvaluationConte
  * Evaluate deref: ["deref", "EntityType"] or ["deref", "EntityType", idExpr]
  * Pure snapshot read. Returns current entity data from store.
  */
-export function evalDeref(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+export function evalDeref(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
   const entityType = args[0] as string;
   const id = args.length > 1 ? evaluate(args[1], ctx) : undefined;
   if (ctx.effectHandlers?.deref) {
@@ -360,14 +359,14 @@ export function evalDeref(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCon
     return ctx.effectHandlers.fetch(entityType, id);
   }
   // Return entity data from context if available
-  return (ctx.entity as Record<string, unknown>)?.[entityType] ?? [];
+  return ctx.entity[entityType] ?? [];
 }
 
 /**
  * Evaluate swap!: ["swap!", "EntityType", idExpr, transformExpr]
  * Atomic read-modify-write with CAS retry.
  */
-export function evalSwap(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+export function evalSwap(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
   const entityType = args[0] as string;
   const id = evaluate(args[1], ctx);
   const transformExpr = args[2];
@@ -395,7 +394,7 @@ export function evalWatch(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCon
  * Evaluate atomic: ["atomic", [effect1, effect2, ...]]
  * Groups effects into a transaction. All succeed or all roll back.
  */
-export function evalAtomic(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+export function evalAtomic(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
   const effects = args[0] as SExpr[];
   if (ctx.effectHandlers?.atomic) {
     return ctx.effectHandlers.atomic(effects, evaluate, ctx);
@@ -412,7 +411,7 @@ export function evalAtomic(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCo
 /**
  * Convert a value to a number.
  */
-function toNumber(value: unknown): number {
+function toNumber(value: RuntimeValue): number {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
     const parsed = parseFloat(value);

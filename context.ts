@@ -7,7 +7,8 @@
  * @packageDocumentation
  */
 
-import type { AgentContext, LlmContext, WorkspaceContext, SessionContext, MemoryContext, TraceContext, IntegrationContext, TraitConfig, NavItem } from '@almadar/core';
+import type { AgentContext, LlmContext, WorkspaceContext, SessionContext, MemoryContext, TraceContext, IntegrationContext, TraitConfig, NavItem, EntityRow, EventPayload, FieldValue, RuntimeValue } from '@almadar/core';
+import type { SExpr } from './types/expression.js';
 
 /**
  * User context for `@user` bindings — owned by `@almadar/core` so the
@@ -22,10 +23,10 @@ import type { UserContext } from '@almadar/core';
  */
 export interface EvaluationContext {
   /** Entity data for @entity bindings */
-  entity: Record<string, unknown>;
+  entity: EntityRow;
 
   /** Payload data for @payload bindings */
-  payload: Record<string, unknown>;
+  payload: EventPayload;
 
   /** Current state for @state binding */
   state: string;
@@ -37,10 +38,10 @@ export interface EvaluationContext {
   user?: UserContext;
 
   /** Singleton entities for @EntityName bindings */
-  singletons: Map<string, Record<string, unknown>>;
+  singletons: Map<string, EntityRow>;
 
   /** Local variables from 'let' bindings */
-  locals?: Map<string, unknown>;
+  locals?: Map<string, RuntimeValue>;
 
   /**
    * Call-site trait config for @config bindings. Populated by
@@ -104,34 +105,34 @@ export interface EvaluationContext {
   // ============================================================================
 
   /** Mutate entity fields */
-  mutateEntity?: (changes: Record<string, unknown>) => void;
+  mutateEntity?: (changes: Record<string, RuntimeValue>) => void;
 
   /** Emit an event */
-  emit?: (event: string, payload?: unknown) => void;
+  emit?: (event: string, payload?: RuntimeValue) => void;
 
   /** Navigate to a route */
-  navigate?: (route: string, params?: Record<string, unknown>) => void;
+  navigate?: (route: string, params?: Record<string, RuntimeValue>) => void;
 
   /** Persist data (create/update/delete/batch) */
-  persist?: (action: 'create' | 'update' | 'delete' | 'batch', data?: Record<string, unknown>) => Promise<void>;
+  persist?: (action: 'create' | 'update' | 'delete' | 'batch', data?: Record<string, RuntimeValue>) => Promise<void>;
 
   /** Show a notification */
   notify?: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 
   /** Spawn a new entity instance */
-  spawn?: (entityType: string, props?: Record<string, unknown>) => void;
+  spawn?: (entityType: string, props?: Record<string, RuntimeValue>) => void;
 
   /** Despawn an entity instance */
   despawn?: (entityId?: string) => void;
 
   /** Call an external service */
-  callService?: (service: string, method: string, params?: Record<string, unknown>) => Promise<unknown>;
+  callService?: (service: string, method: string, params?: Record<string, RuntimeValue>) => Promise<RuntimeValue>;
 
   /** Render UI to a slot */
-  renderUI?: (slot: string, pattern: unknown, props?: Record<string, unknown>, priority?: number) => void;
+  renderUI?: (slot: string, pattern: RuntimeValue, props?: Record<string, RuntimeValue>, priority?: number) => void;
 
   /** Register an OS trigger (server-side only) */
-  registerOsTrigger?: (type: string, config: Record<string, unknown>) => void;
+  registerOsTrigger?: (type: string, config: Record<string, RuntimeValue>) => void;
 
   // ============================================================================
   // Resource Operators (ref/deref/swap!/watch/atomic)
@@ -139,22 +140,29 @@ export interface EvaluationContext {
 
   /** Effect handlers for resource operators (grouped to avoid top-level pollution) */
   effectHandlers?: {
-    ref?: (entityType: string, options?: unknown) => unknown;
-    deref?: (entityType: string, id?: unknown) => unknown;
-    swap?: (entityType: string, id: unknown, transformExpr: unknown, evaluate: unknown, ctx: unknown) => unknown;
-    watch?: (entityType: string, effects: unknown[], evaluate: unknown, ctx: unknown) => void;
-    atomic?: (effects: unknown[], evaluate: unknown, ctx: unknown) => unknown;
-    fetch?: (entityType: string, options?: unknown) => unknown;
+    ref?: (entityType: string, options?: RuntimeValue) => RuntimeValue;
+    deref?: (entityType: string, id?: RuntimeValue) => RuntimeValue;
+    swap?: (entityType: string, id: RuntimeValue, transformExpr: SExpr, evaluate: Evaluator, ctx: EvaluationContext) => RuntimeValue;
+    watch?: (entityType: string, effects: SExpr[], evaluate: Evaluator, ctx: EvaluationContext) => void;
+    atomic?: (effects: SExpr[], evaluate: Evaluator, ctx: EvaluationContext) => RuntimeValue;
+    fetch?: (entityType: string, options?: RuntimeValue) => RuntimeValue;
   };
 }
+
+/**
+ * The function operator implementations receive to evaluate child
+ * expressions — the interpreter's `evaluate` or a compiled tree's
+ * child-dispatch; both share this contract.
+ */
+export type Evaluator = (expr: SExpr, ctx: EvaluationContext) => RuntimeValue;
 
 /**
  * Create a minimal evaluation context for testing/guards.
  * Only includes bindings, no effect handlers.
  */
 export function createMinimalContext(
-  entity: Record<string, unknown> = {},
-  payload: Record<string, unknown> = {},
+  entity: EntityRow = {},
+  payload: EventPayload = {},
   state: string = 'initial'
 ): EvaluationContext {
   return {
@@ -188,7 +196,7 @@ export function createEffectContext(
  */
 export function createChildContext(
   parent: EvaluationContext,
-  locals: Map<string, unknown>
+  locals: Map<string, RuntimeValue>
 ): EvaluationContext {
   // Merge parent locals with new locals
   const mergedLocals = new Map(parent.locals);
@@ -218,12 +226,17 @@ export function createChildContext(
  */
 const CLIENT_ONLY_BINDING_ROOTS: ReadonlySet<string> = new Set(['trait']);
 
-export function resolveBinding(binding: string, ctx: EvaluationContext): unknown {
-  if (!binding.startsWith('@')) {
-    return undefined;
-  }
+/**
+ * Pre-parsed binding paths. Binding strings are schema-authored and finite,
+ * so the parse (split + bracket-index regex expansion) is cached forever
+ * rather than re-run per resolution — the single hottest evaluator helper
+ * on tick-heavy boards (R-EVALUATOR-JIT-IS-A-WRAPPER).
+ */
+const PARSED_PATH_CACHE = new Map<string, { root: string; path: readonly string[] }>();
 
-  const withoutPrefix = binding.slice(1);
+function parseBindingPath(withoutPrefix: string): { root: string; path: readonly string[] } {
+  const cached = PARSED_PATH_CACHE.get(withoutPrefix);
+  if (cached) return cached;
   // Split on `.` but also expand bracket-index segments into separate
   // path steps. `config.sections[0].bullets` -> ['config', 'sections',
   // '0', 'bullets']. Indices are numeric strings; the navigation loop
@@ -239,8 +252,17 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): unknown
     const indices = Array.from(m[2].matchAll(/\[(\d+)\]/g)).map((x) => x[1]);
     return [head, ...indices];
   });
-  const root = parts[0];
-  const path = parts.slice(1);
+  const parsed = { root: parts[0], path: parts.slice(1) };
+  PARSED_PATH_CACHE.set(withoutPrefix, parsed);
+  return parsed;
+}
+
+export function resolveBinding(binding: string, ctx: EvaluationContext): RuntimeValue {
+  if (!binding.startsWith('@')) {
+    return undefined;
+  }
+
+  const { root, path } = parseBindingPath(binding.slice(1));
 
   // Client-only bindings never resolve server-side. Short-circuit so
   // strict-mode warnings don't fire on intentional-unresolved paths.
@@ -248,7 +270,7 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): unknown
     return undefined;
   }
 
-  let value: unknown;
+  let value: RuntimeValue;
 
   // Check locals first
   if (ctx.locals?.has(root)) {
@@ -306,7 +328,7 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): unknown
       return undefined;
     }
     if (typeof value === 'object') {
-      value = (value as Record<string, unknown>)[segment];
+      value = (value as Record<string, RuntimeValue>)[segment];
     } else {
       if (ctx.strictBindings) {
         const resolvedSoFar = [root, ...path.slice(0, i)].join('.');

@@ -10,20 +10,21 @@
 
 import type { SExpr } from '../types/expression.js';
 import type { EvaluationContext } from '../context.js';
+import type { RuntimeValue } from '@almadar/core';
 
-type Evaluator = (expr: SExpr, ctx: EvaluationContext) => unknown;
+type Evaluator = (expr: SExpr, ctx: EvaluationContext) => RuntimeValue;
 
 function registerTrigger(
   ctx: EvaluationContext,
   type: string,
-  config: Record<string, unknown>,
+  config: Record<string, RuntimeValue>,
 ): void {
   ctx.registerOsTrigger?.(type, config);
 }
 
 export function evalOsWatchFiles(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): void {
   const glob = evaluate(args[0], ctx) as string;
-  const options = args[1] ? (evaluate(args[1], ctx) as Record<string, unknown>) : {};
+  const options = args[1] ? (evaluate(args[1], ctx) as Record<string, RuntimeValue>) : {};
   registerTrigger(ctx, 'watch-files', { glob, ...options });
 }
 

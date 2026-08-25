@@ -11,6 +11,7 @@
 import type { SExpr } from '../types/expression.js';
 import type { EvaluationContext } from '../context.js';
 import type { LlmMessage, LlmToolDef } from '@almadar/core';
+import type { RuntimeValue } from '@almadar/core';
 
 type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
@@ -59,7 +60,7 @@ export function evalLlmSwitch(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): void {
+): RuntimeValue {
   if (!ctx.llm) return;
   const provider = evaluate(args[0], ctx) as string;
   const model = args.length > 1 ? (evaluate(args[1], ctx) as string) : undefined;

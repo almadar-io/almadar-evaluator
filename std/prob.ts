@@ -10,8 +10,9 @@
 
 import type { SExpr } from '../types/expression.js';
 import type { EvaluationContext } from '../context.js';
+import type { RuntimeValue } from '@almadar/core';
 
-type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
+type EvalFn = (expr: SExpr, ctx: EvaluationContext) => RuntimeValue;
 
 // ============================================================================
 // Seeded PRNG (Mulberry32)
@@ -163,8 +164,8 @@ export function evalProbCategorical(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): unknown {
-  const items = evaluate(args[0], ctx) as unknown[];
+): RuntimeValue {
+  const items = evaluate(args[0], ctx) as RuntimeValue[];
   const weights = evaluate(args[1], ctx) as number[];
 
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);

@@ -11,8 +11,9 @@ import type { SExpr } from '../types/expression.js';
 import type { EvaluationContext } from '../context.js';
 import { createChildContext } from '../context.js';
 import { isSExpr, getOperator, getArgs } from '../types/expression.js';
+import type { RuntimeValue } from '@almadar/core';
 
-type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
+type EvalFn = (expr: SExpr, ctx: EvaluationContext) => RuntimeValue;
 
 /** Keys that must never be written via a path/merge — guards against prototype pollution. */
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -24,8 +25,8 @@ function evalLambda(
   lambdaExpr: SExpr,
   evaluate: EvalFn,
   ctx: EvaluationContext,
-  ...values: unknown[]
-): unknown {
+  ...values: RuntimeValue[]
+): RuntimeValue {
   if (!isSExpr(lambdaExpr) || getOperator(lambdaExpr) !== 'fn') {
     return evaluate(lambdaExpr, ctx);
   }
@@ -35,7 +36,7 @@ function evalLambda(
   const body = args[1];
 
   // Create new locals map for the child context
-  const newLocals = new Map<string, unknown>();
+  const newLocals = new Map<string, RuntimeValue>();
 
   if (Array.isArray(params)) {
     // Multiple params: ["fn", ["a", "b"], body]
@@ -68,7 +69,7 @@ export function evalObjectKeys(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): string[] {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   return Object.keys(obj ?? {});
 }
 
@@ -80,7 +81,7 @@ export function evalObjectValues(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   return Object.values(obj ?? {});
 }
 
@@ -92,7 +93,7 @@ export function evalObjectEntries(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): [string, unknown][] {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   return Object.entries(obj ?? {});
 }
 
@@ -103,8 +104,8 @@ export function evalObjectFromEntries(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const entries = evaluate(args[0], ctx) as [string, unknown][];
+): Record<string, RuntimeValue> {
+  const entries = evaluate(args[0], ctx) as [string, RuntimeValue][];
   return Object.fromEntries(entries ?? []);
 }
 
@@ -115,21 +116,21 @@ export function evalObjectGet(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): unknown {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+): RuntimeValue {
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   const path = evaluate(args[1], ctx) as string;
   const defaultValue = args.length > 2 ? evaluate(args[2], ctx) : undefined;
 
   if (!obj || !path) return defaultValue;
 
   const parts = path.split('.');
-  let current: unknown = obj;
+  let current: RuntimeValue = obj;
 
   for (const part of parts) {
     if (current === null || current === undefined) {
       return defaultValue;
     }
-    current = (current as Record<string, unknown>)[part];
+    current = (current as Record<string, RuntimeValue>)[part];
   }
 
   return current !== undefined ? current : defaultValue;
@@ -142,8 +143,8 @@ export function evalObjectSet(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+): Record<string, RuntimeValue> {
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   const path = evaluate(args[1], ctx) as string;
   const value = evaluate(args[2], ctx);
 
@@ -162,7 +163,7 @@ export function evalObjectSet(
     if (!current[part] || typeof current[part] !== 'object') {
       current[part] = {};
     }
-    current = current[part] as Record<string, unknown>;
+    current = current[part] as Record<string, RuntimeValue>;
   }
 
   current[parts[parts.length - 1]] = value;
@@ -177,13 +178,13 @@ export function evalObjectHas(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): boolean {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   const path = evaluate(args[1], ctx) as string;
 
   if (!obj || !path) return false;
 
   const parts = path.split('.');
-  let current: unknown = obj;
+  let current: RuntimeValue = obj;
 
   for (const part of parts) {
     if (current === null || current === undefined) {
@@ -192,7 +193,7 @@ export function evalObjectHas(
     if (!Object.prototype.hasOwnProperty.call(current, part)) {
       return false;
     }
-    current = (current as Record<string, unknown>)[part];
+    current = (current as Record<string, RuntimeValue>)[part];
   }
 
   return true;
@@ -205,8 +206,8 @@ export function evalObjectMerge(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const objects = args.map((a) => evaluate(a, ctx) as Record<string, unknown>);
+): Record<string, RuntimeValue> {
+  const objects = args.map((a) => evaluate(a, ctx) as Record<string, RuntimeValue>);
   return Object.assign({}, ...objects.map((o) => o ?? {}));
 }
 
@@ -217,13 +218,13 @@ export function evalObjectDeepMerge(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const objects = args.map((a) => evaluate(a, ctx) as Record<string, unknown>);
+): Record<string, RuntimeValue> {
+  const objects = args.map((a) => evaluate(a, ctx) as Record<string, RuntimeValue>);
 
   function deepMerge(
-    target: Record<string, unknown>,
-    source: Record<string, unknown>
-  ): Record<string, unknown> {
+    target: Record<string, RuntimeValue>,
+    source: Record<string, RuntimeValue>
+  ): Record<string, RuntimeValue> {
     const result = { ...target };
     for (const key of Object.keys(source)) {
       if (FORBIDDEN_KEYS.has(key)) continue; // skip prototype-polluting keys
@@ -236,8 +237,8 @@ export function evalObjectDeepMerge(
         !Array.isArray(target[key])
       ) {
         result[key] = deepMerge(
-          target[key] as Record<string, unknown>,
-          source[key] as Record<string, unknown>
+          target[key] as Record<string, RuntimeValue>,
+          source[key] as Record<string, RuntimeValue>
         );
       } else {
         result[key] = source[key];
@@ -246,7 +247,7 @@ export function evalObjectDeepMerge(
     return result;
   }
 
-  return objects.reduce((acc, obj) => deepMerge(acc, obj ?? {}), {} as Record<string, unknown>);
+  return objects.reduce((acc, obj) => deepMerge(acc, obj ?? {}), {} as Record<string, RuntimeValue>);
 }
 
 /**
@@ -256,11 +257,11 @@ export function evalObjectPick(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+): Record<string, RuntimeValue> {
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   const keys = evaluate(args[1], ctx) as string[];
 
-  const result: Record<string, unknown> = {};
+  const result: Record<string, RuntimeValue> = {};
   for (const key of keys ?? []) {
     if (obj && Object.prototype.hasOwnProperty.call(obj, key)) {
       result[key] = obj[key];
@@ -276,12 +277,12 @@ export function evalObjectOmit(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+): Record<string, RuntimeValue> {
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   const keys = evaluate(args[1], ctx) as string[];
 
   const keysSet = new Set(keys ?? []);
-  const result: Record<string, unknown> = {};
+  const result: Record<string, RuntimeValue> = {};
   for (const key of Object.keys(obj ?? {})) {
     if (!keysSet.has(key)) {
       result[key] = obj[key];
@@ -297,11 +298,11 @@ export function evalObjectMapValues(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+): Record<string, RuntimeValue> {
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   const lambda = args[1];
 
-  const result: Record<string, unknown> = {};
+  const result: Record<string, RuntimeValue> = {};
   for (const [key, value] of Object.entries(obj ?? {})) {
     result[key] = evalLambda(lambda, evaluate, ctx, value);
   }
@@ -315,11 +316,11 @@ export function evalObjectMapKeys(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+): Record<string, RuntimeValue> {
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   const lambda = args[1];
 
-  const result: Record<string, unknown> = {};
+  const result: Record<string, RuntimeValue> = {};
   for (const [key, value] of Object.entries(obj ?? {})) {
     const newKey = String(evalLambda(lambda, evaluate, ctx, key));
     result[newKey] = value;
@@ -334,11 +335,11 @@ export function evalObjectFilter(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+): Record<string, RuntimeValue> {
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   const lambda = args[1];
 
-  const result: Record<string, unknown> = {};
+  const result: Record<string, RuntimeValue> = {};
   for (const [key, value] of Object.entries(obj ?? {})) {
     if (evalLambda(lambda, evaluate, ctx, key, value)) {
       result[key] = value;
@@ -355,7 +356,7 @@ export function evalObjectEmpty(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): boolean {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   return !obj || Object.keys(obj).length === 0;
 }
 
@@ -381,7 +382,7 @@ export function evalObjectEquals(
     if (xKeys.length !== yKeys.length) return false;
 
     for (const key of xKeys) {
-      if (!deepEqual((x as Record<string, unknown>)[key], (y as Record<string, unknown>)[key])) {
+      if (!deepEqual((x as Record<string, RuntimeValue>)[key], (y as Record<string, RuntimeValue>)[key])) {
         return false;
       }
     }
@@ -398,8 +399,8 @@ export function evalObjectClone(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+): Record<string, RuntimeValue> {
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   return { ...(obj ?? {}) };
 }
 
@@ -410,8 +411,8 @@ export function evalObjectDeepClone(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): Record<string, unknown> {
-  const obj = evaluate(args[0], ctx) as Record<string, unknown>;
+): Record<string, RuntimeValue> {
+  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
   return structuredClone(obj ?? {});
 }
 

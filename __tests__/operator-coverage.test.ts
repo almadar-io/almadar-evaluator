@@ -2,8 +2,9 @@
  * Operator Coverage Safety Net
  *
  * Enumerates every operator declared in `@almadar/std`'s registry and
- * asserts each one either (a) has a dispatch `case` in
- * `SExpressionEvaluator.ts::dispatchOperator`, or (b) is explicitly
+ * asserts each one either (a) has an entry in `OPERATOR_TABLE` (the
+ * dispatch mapping in `SExpressionEvaluator.ts`, formerly the
+ * `dispatchOperator` switch), or (b) is explicitly
  * allowlisted below with a stated reason. Before this test, an operator
  * could be declared (and pass `orb validate`) with zero runtime-path
  * implementation, silently unrunnable under `@almadar/runtime` — exactly
@@ -21,12 +22,14 @@ import { getAllStdOperators, getStdOperatorMeta } from '@almadar/std/registry';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const evaluatorSource = readFileSync(path.join(here, '../SExpressionEvaluator.ts'), 'utf-8');
 
-/** Every operator name that appears as a `case '<name>':` label in dispatchOperator's switch. */
+/** Every operator name that appears as a `'<name>':` key in OPERATOR_TABLE (the dispatch mapping that replaced the switch). */
 function dispatchedOperatorNames(): Set<string> {
   const names = new Set<string>();
-  const caseRe = /case\s+'([^']+)'\s*:/g;
+  const tableMatch = /const OPERATOR_TABLE[^=]*= \{(.*?)\n\};/s.exec(evaluatorSource);
+  if (!tableMatch) return names;
+  const keyRe = /^\s*'([^']+)':/gm;
   let match: RegExpExecArray | null;
-  while ((match = caseRe.exec(evaluatorSource)) !== null) {
+  while ((match = keyRe.exec(tableMatch[1])) !== null) {
     names.add(match[1]);
   }
   return names;
@@ -68,11 +71,15 @@ export const KNOWN_GAPS: readonly string[] = [
   'send-server',
   'log',
   'fetch',
+  // core.ts navigation — surfaced 2026-08-25 by the OPERATOR_TABLE refactor
+  // (pre-existing: never had a dispatch case; added to the registry 2026-08-22)
+  'navigate-back',
   // browser.ts
   'browser/open-file-picker',
   'browser/clipboard-read',
   'browser/clipboard-write',
   'browser/geolocation-current',
+  'browser/push-subscribe',
   // composition.ts
   'behavior/compose',
   'behavior/wire',

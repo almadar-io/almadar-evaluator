@@ -13,7 +13,7 @@ import { createChildContext } from '../context.js';
 import { isSExpr, getOperator, getArgs } from '../types/expression.js';
 import type { RuntimeValue } from '@almadar/core';
 
-type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
+type EvalFn = (expr: SExpr, ctx: EvaluationContext) => RuntimeValue;
 
 /**
  * Evaluate an expression with @item and @index bound in context.
@@ -31,10 +31,10 @@ function evalWithItem(
   expr: SExpr,
   evaluate: EvalFn,
   ctx: EvaluationContext,
-  item: unknown,
+  item: RuntimeValue,
   index: number
-): unknown {
-  const locals = new Map<string, unknown>();
+): RuntimeValue {
+  const locals = new Map<string, RuntimeValue>();
   locals.set('item', item);
   locals.set('index', index);
 
@@ -80,7 +80,7 @@ function evalWithItem(
     // `["fn", …]` to an evalFn closure (config literals are evaluated once
     // wholesale), so apply the closure per evalFn's `(item, evaluate, ctx)`
     // contract instead of returning it as a truthy predicate.
-    result = (result as (item: unknown, evaluate: EvalFn, ctx: EvaluationContext) => RuntimeValue)(item, evaluate, childCtx);
+    result = (result as (item: RuntimeValue, evaluate: EvalFn, ctx: EvaluationContext) => RuntimeValue)(item, evaluate, childCtx);
   }
   return result;
 }
@@ -94,10 +94,10 @@ function evalReduceLambda(
   lambdaExpr: SExpr,
   evaluate: EvalFn,
   ctx: EvaluationContext,
-  acc: unknown,
-  item: unknown
-): unknown {
-  const locals = new Map<string, unknown>();
+  acc: RuntimeValue,
+  item: RuntimeValue
+): RuntimeValue {
+  const locals = new Map<string, RuntimeValue>();
 
   if (isSExpr(lambdaExpr) && getOperator(lambdaExpr) === 'fn') {
     const fnArgs = getArgs(lambdaExpr);
@@ -135,7 +135,7 @@ export function evalArrayLen(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): number {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   return arr?.length ?? 0;
 }
 
@@ -173,7 +173,7 @@ export function evalArrayEmpty(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): boolean {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   return !arr || arr.length === 0;
 }
 
@@ -184,8 +184,8 @@ export function evalArrayFirst(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): unknown {
-  const arr = evaluate(args[0], ctx) as unknown[];
+): RuntimeValue {
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   return arr?.[0] ?? null;
 }
 
@@ -196,8 +196,8 @@ export function evalArrayLast(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): unknown {
-  const arr = evaluate(args[0], ctx) as unknown[];
+): RuntimeValue {
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   if (!Array.isArray(arr) || arr.length === 0) return null;
   return arr[arr.length - 1];
 }
@@ -209,8 +209,8 @@ export function evalArrayNth(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): unknown {
-  const arr = evaluate(args[0], ctx) as unknown[];
+): RuntimeValue {
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const index = evaluate(args[1], ctx) as number;
   return arr?.[index] ?? null;
 }
@@ -223,7 +223,7 @@ export function evalArraySlice(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const start = evaluate(args[1], ctx) as number;
   const end = args.length > 2 ? (evaluate(args[2], ctx) as number) : undefined;
   return arr?.slice(start, end) ?? [];
@@ -237,8 +237,8 @@ export function evalArrayConcat(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arrays = args.map((a) => evaluate(a, ctx) as unknown[]);
-  return arrays.reduce((acc, arr) => acc.concat(arr ?? []), [] as unknown[]);
+  const arrays = args.map((a) => evaluate(a, ctx) as RuntimeValue[]);
+  return arrays.reduce((acc, arr) => acc.concat(arr ?? []), [] as RuntimeValue[]);
 }
 
 /**
@@ -249,7 +249,7 @@ export function evalArrayAppend(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const item = evaluate(args[1], ctx);
   return [...(arr ?? []), item];
 }
@@ -262,7 +262,7 @@ export function evalArrayPrepend(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const item = evaluate(args[1], ctx);
   return [item, ...(arr ?? [])];
 }
@@ -275,7 +275,7 @@ export function evalArrayInsert(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const index = evaluate(args[1], ctx) as number;
   const item = evaluate(args[2], ctx);
   const result = [...(arr ?? [])];
@@ -291,7 +291,7 @@ export function evalArrayRemove(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const index = evaluate(args[1], ctx) as number;
   const result = [...(arr ?? [])];
   result.splice(index, 1);
@@ -306,7 +306,7 @@ export function evalArrayRemoveItem(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const item = evaluate(args[1], ctx);
   const index = arr?.indexOf(item) ?? -1;
   if (index === -1) return arr ?? [];
@@ -323,7 +323,7 @@ export function evalArrayReverse(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   return [...(arr ?? [])].reverse();
 }
 
@@ -335,7 +335,7 @@ export function evalArraySort(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const key = args.length > 1 ? (evaluate(args[1], ctx) as string) : undefined;
   const dir = args.length > 2 ? (evaluate(args[2], ctx) as string) : 'asc';
 
@@ -370,7 +370,7 @@ export function evalArrayShuffle(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const result = [...(arr ?? [])];
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -387,7 +387,7 @@ export function evalArrayUnique(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   return [...new Set(arr ?? [])];
 }
 
@@ -399,7 +399,7 @@ export function evalArrayFlatten(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   return (arr ?? []).flat();
 }
 
@@ -411,8 +411,8 @@ export function evalArrayZip(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[][] {
-  const arr1 = evaluate(args[0], ctx) as unknown[];
-  const arr2 = evaluate(args[1], ctx) as unknown[];
+  const arr1 = evaluate(args[0], ctx) as RuntimeValue[];
+  const arr2 = evaluate(args[1], ctx) as RuntimeValue[];
   const len = Math.min(arr1?.length ?? 0, arr2?.length ?? 0);
   const result: unknown[][] = [];
   for (let i = 0; i < len; i++) {
@@ -429,7 +429,7 @@ export function evalArrayIncludes(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): boolean {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const item = evaluate(args[1], ctx);
   return arr?.includes(item) ?? false;
 }
@@ -442,7 +442,7 @@ export function evalArrayIndexOf(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): number {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const item = evaluate(args[1], ctx);
   return arr?.indexOf(item) ?? -1;
 }
@@ -455,8 +455,8 @@ export function evalArrayFind(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): unknown {
-  const arr = evaluate(args[0], ctx) as unknown[];
+): RuntimeValue {
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const predExpr = args[1];
   // No-match returns null (not JS `undefined`) to match the Rust FindOp
   // contract and the `(!= (array/find …) null)` checks behaviors rely on.
@@ -472,7 +472,7 @@ export function evalArrayFindIndex(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): number {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const predExpr = args[1];
   return (arr ?? []).findIndex((item, i) => evalWithItem(predExpr, evaluate, ctx, item, i));
 }
@@ -486,7 +486,7 @@ export function evalArrayFilter(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const predExpr = args[1];
   return (arr ?? []).filter((item, i) => evalWithItem(predExpr, evaluate, ctx, item, i));
 }
@@ -500,7 +500,7 @@ export function evalArrayReject(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const predExpr = args[1];
   return (arr ?? []).filter((item, i) => !evalWithItem(predExpr, evaluate, ctx, item, i));
 }
@@ -514,7 +514,7 @@ export function evalArrayMap(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const mapExpr = args[1];
   return (arr ?? []).map((item, i) => evalWithItem(mapExpr, evaluate, ctx, item, i));
 }
@@ -527,7 +527,7 @@ export function evalArrayReduce(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): unknown {
+): RuntimeValue {
   if (
     isSExpr(args[1]) &&
     getOperator(args[1]) === 'fn' &&
@@ -537,7 +537,7 @@ export function evalArrayReduce(
       '(array/reduce …): the reducer lambda goes at argument 3 — (array/reduce arr init (fn (acc x) …)) — same order the compiled path enforces (SEXPR_LAMBDA_ARG_POSITION)'
     );
   }
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const init = evaluate(args[1], ctx);
   const reducerExpr = args[2];
   return (arr ?? []).reduce(
@@ -555,7 +555,7 @@ export function evalArrayEvery(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): boolean {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const predExpr = args[1];
   return (arr ?? []).every((item, i) => Boolean(evalWithItem(predExpr, evaluate, ctx, item, i)));
 }
@@ -569,7 +569,7 @@ export function evalArraySome(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): boolean {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const predExpr = args[1];
   return (arr ?? []).some((item, i) => Boolean(evalWithItem(predExpr, evaluate, ctx, item, i)));
 }
@@ -583,7 +583,7 @@ export function evalArrayCount(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): number {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   if (args.length > 1) {
     const predExpr = args[1];
     return (arr ?? []).filter((item, i) => evalWithItem(predExpr, evaluate, ctx, item, i)).length;
@@ -599,7 +599,7 @@ export function evalArraySum(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): number {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const key = args.length > 1 ? (evaluate(args[1], ctx) as string) : undefined;
 
   return (arr ?? []).reduce((sum: number, item) => {
@@ -616,7 +616,7 @@ export function evalArrayAvg(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): number {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   if (!arr || arr.length === 0) return 0;
 
   const key = args.length > 1 ? (evaluate(args[1], ctx) as string) : undefined;
@@ -637,7 +637,7 @@ export function evalArrayMin(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): number {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   if (!arr || arr.length === 0) return 0;
 
   const key = args.length > 1 ? (evaluate(args[1], ctx) as string) : undefined;
@@ -658,7 +658,7 @@ export function evalArrayMax(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): number {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   if (!arr || arr.length === 0) return 0;
 
   const key = args.length > 1 ? (evaluate(args[1], ctx) as string) : undefined;
@@ -679,7 +679,7 @@ export function evalArrayGroupBy(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): Record<string, unknown[]> {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const key = evaluate(args[1], ctx) as string;
 
   const result: Record<string, unknown[]> = {};
@@ -702,7 +702,7 @@ export function evalArrayPartition(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): [unknown[], unknown[]] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const predExpr = args[1];
 
   const matches: unknown[] = [];
@@ -727,7 +727,7 @@ export function evalArrayTake(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const n = evaluate(args[1], ctx) as number;
   return (arr ?? []).slice(0, n);
 }
@@ -740,7 +740,7 @@ export function evalArrayDrop(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const n = evaluate(args[1], ctx) as number;
   return (arr ?? []).slice(n);
 }
@@ -753,7 +753,7 @@ export function evalArrayTakeLast(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const n = evaluate(args[1], ctx) as number;
   return (arr ?? []).slice(-n);
 }
@@ -766,7 +766,7 @@ export function evalArrayDropLast(
   evaluate: EvalFn,
   ctx: EvaluationContext
 ): unknown[] {
-  const arr = evaluate(args[0], ctx) as unknown[];
+  const arr = evaluate(args[0], ctx) as RuntimeValue[];
   const n = evaluate(args[1], ctx) as number;
   return (arr ?? []).slice(0, -n);
 }

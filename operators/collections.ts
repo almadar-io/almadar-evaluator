@@ -8,19 +8,18 @@
  */
 
 import type { SExpr } from '../types/expression.js';
-import type { EvaluationContext } from '../context.js';
+import type { EvaluationContext, Evaluator } from '../context.js';
+import type { RuntimeValue } from '@almadar/core';
 import { createChildContext } from '../context.js';
-
-type Evaluator = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
 function withItem(
   expr: SExpr,
   evaluate: Evaluator,
   ctx: EvaluationContext,
-  item: unknown,
+  item: RuntimeValue,
   index: number
-): unknown {
-  const locals = new Map<string, unknown>();
+): RuntimeValue {
+  const locals = new Map<string, RuntimeValue>();
   locals.set('item', item);
   locals.set('index', index);
   return evaluate(expr, createChildContext(ctx, locals));
@@ -29,7 +28,7 @@ function withItem(
 /**
  * Evaluate map: ["map", collection, expr_using_@item]
  */
-export function evalMap(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown[] {
+export function evalMap(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue[] {
   const collection = toArray(evaluate(args[0], ctx));
   const mapExpr = args[1];
   return collection.map((item, i) => withItem(mapExpr, evaluate, ctx, item, i));
@@ -38,7 +37,7 @@ export function evalMap(args: SExpr[], evaluate: Evaluator, ctx: EvaluationConte
 /**
  * Evaluate filter: ["filter", collection, expr_using_@item]
  */
-export function evalFilter(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown[] {
+export function evalFilter(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue[] {
   const collection = toArray(evaluate(args[0], ctx));
   const predExpr = args[1];
   return collection.filter((item, i) => Boolean(withItem(predExpr, evaluate, ctx, item, i)));
@@ -47,7 +46,7 @@ export function evalFilter(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCo
 /**
  * Evaluate find: ["find", collection, expr_using_@item]
  */
-export function evalFind(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+export function evalFind(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
   const collection = toArray(evaluate(args[0], ctx));
   const predExpr = args[1];
   return collection.find((item, i) => Boolean(withItem(predExpr, evaluate, ctx, item, i)));
@@ -73,7 +72,7 @@ export function evalSum(args: SExpr[], evaluate: Evaluator, ctx: EvaluationConte
 
   const mapExpr = args[1];
   return collection.reduce((sum: number, item, i) => {
-    const locals = new Map<string, unknown>();
+    const locals = new Map<string, RuntimeValue>();
     locals.set('item', item);
     locals.set('index', i);
     const childCtx = createChildContext(ctx, locals);
@@ -84,7 +83,7 @@ export function evalSum(args: SExpr[], evaluate: Evaluator, ctx: EvaluationConte
 /**
  * Evaluate first: ["first", collection]
  */
-export function evalFirst(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+export function evalFirst(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
   const collection = toArray(evaluate(args[0], ctx));
   return collection.length > 0 ? collection[0] : undefined;
 }
@@ -92,7 +91,7 @@ export function evalFirst(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCon
 /**
  * Evaluate last: ["last", collection]
  */
-export function evalLast(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+export function evalLast(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
   const collection = toArray(evaluate(args[0], ctx));
   return collection.length > 0 ? collection[collection.length - 1] : undefined;
 }
@@ -100,7 +99,7 @@ export function evalLast(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCont
 /**
  * Evaluate nth: ["nth", collection, index]
  */
-export function evalNth(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+export function evalNth(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
   const collection = toArray(evaluate(args[0], ctx));
   const index = toNumber(evaluate(args[1], ctx));
   return collection[index];
@@ -109,8 +108,8 @@ export function evalNth(args: SExpr[], evaluate: Evaluator, ctx: EvaluationConte
 /**
  * Evaluate concat: ["concat", collection1, collection2, ...]
  */
-export function evalConcat(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown[] {
-  const result: unknown[] = [];
+export function evalConcat(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue[] {
+  const result: RuntimeValue[] = [];
   for (const arg of args) {
     const collection = toArray(evaluate(arg, ctx));
     result.push(...collection);
@@ -143,14 +142,14 @@ export function evalEmpty(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCon
  * operator name (e.g. `[path method …]` would otherwise be read as the `path`
  * operator call and collapse to a string).
  */
-export function evalList(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown[] {
+export function evalList(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue[] {
   return args.map((arg) => evaluate(arg, ctx));
 }
 
 /**
  * Convert a value to an array.
  */
-function toArray(value: unknown): unknown[] {
+function toArray(value: RuntimeValue): RuntimeValue[] {
   if (Array.isArray(value)) return value;
   if (value === null || value === undefined) return [];
   return [value];
@@ -159,7 +158,7 @@ function toArray(value: unknown): unknown[] {
 /**
  * Convert a value to a number.
  */
-function toNumber(value: unknown): number {
+function toNumber(value: RuntimeValue): number {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
     const parsed = parseFloat(value);

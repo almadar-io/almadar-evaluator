@@ -5,10 +5,9 @@
  */
 
 import type { SExpr } from '../types/expression.js';
-import type { EvaluationContext } from '../context.js';
+import type { EvaluationContext, Evaluator } from '../context.js';
+import type { RuntimeValue } from '@almadar/core';
 import { createChildContext } from '../context.js';
-
-type Evaluator = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
 /**
  * Evaluate let binding.
@@ -27,7 +26,7 @@ type Evaluator = (expr: SExpr, ctx: EvaluationContext) => unknown;
  * reference unresolved (`undefined`), silently corrupting any `let` with
  * dependent bindings.
  */
-export function evalLet(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+export function evalLet(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
   const rawBindings = args[0];
   const body = args[1];
 
@@ -38,7 +37,7 @@ export function evalLet(args: SExpr[], evaluate: Evaluator, ctx: EvaluationConte
 
   // Evaluate each binding against the locals accumulated so far, then fold
   // it in before evaluating the next one.
-  const locals = new Map<string, unknown>();
+  const locals = new Map<string, RuntimeValue>();
   let childCtx = ctx;
   for (const [name, valueExpr] of bindingPairs) {
     const value = evaluate(valueExpr, childCtx);
@@ -55,8 +54,8 @@ export function evalLet(args: SExpr[], evaluate: Evaluator, ctx: EvaluationConte
  * Evaluate do block: ["do", expr1, expr2, ...]
  * Executes expressions in sequence, returns last result.
  */
-export function evalDo(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
-  let result: unknown = undefined;
+export function evalDo(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
+  let result: RuntimeValue = undefined;
   for (const expr of args) {
     result = evaluate(expr, ctx);
   }
@@ -67,11 +66,12 @@ export function evalDo(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContex
  * Evaluate when: ["when", condition, effect]
  * Executes effect only when condition is truthy.
  */
-export function evalWhen(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): void {
+export function evalWhen(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
   const condition = evaluate(args[0], ctx);
   if (Boolean(condition)) {
     evaluate(args[1], ctx);
   }
+  return undefined;
 }
 
 /**
@@ -82,13 +82,13 @@ export function evalFn(
   args: SExpr[],
   _evaluate: Evaluator,
   _ctx: EvaluationContext
-): (item: unknown, evaluate: Evaluator, ctx: EvaluationContext) => unknown {
+): (item: RuntimeValue, evaluate: Evaluator, ctx: EvaluationContext) => RuntimeValue {
   const params = args[0];
   const body = args[1];
 
   // Return a closure that can be called with an item
-  return (item: unknown, evaluate: Evaluator, ctx: EvaluationContext) => {
-    const locals = new Map<string, unknown>();
+  return (item: RuntimeValue, evaluate: Evaluator, ctx: EvaluationContext) => {
+    const locals = new Map<string, RuntimeValue>();
 
     // Handle single variable or array of variables
     if (typeof params === 'string') {

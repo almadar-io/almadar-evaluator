@@ -6,9 +6,8 @@
  */
 
 import type { SExpr } from '../types/expression.js';
-import type { EvaluationContext } from '../context.js';
-
-type Evaluator = (expr: SExpr, ctx: EvaluationContext) => unknown;
+import type { EvaluationContext, Evaluator } from '../context.js';
+import type { RuntimeValue } from '@almadar/core';
 
 /**
  * Evaluate logical AND: ["and", a, b, ...]
@@ -19,8 +18,8 @@ type Evaluator = (expr: SExpr, ctx: EvaluationContext) => unknown;
  * shipping behaviors — this is observationally identical to returning a
  * boolean.)
  */
-export function evalAnd(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
-  let last: unknown = true;
+export function evalAnd(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
+  let last: RuntimeValue = true;
   for (const arg of args) {
     last = evaluate(arg, ctx);
     if (!toBoolean(last)) {
@@ -37,8 +36,8 @@ export function evalAnd(args: SExpr[], evaluate: Evaluator, ctx: EvaluationConte
  * last argument's value if all are falsy. Short-circuits — does not evaluate
  * past the first truthy.
  */
-export function evalOr(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
-  let last: unknown = false;
+export function evalOr(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
+  let last: RuntimeValue = false;
   for (const arg of args) {
     last = evaluate(arg, ctx);
     if (toBoolean(last)) {
@@ -59,7 +58,7 @@ export function evalNot(args: SExpr[], evaluate: Evaluator, ctx: EvaluationConte
  * Evaluate conditional: ["if", condition, then, else]
  * Only evaluates the branch that matches the condition.
  */
-export function evalIf(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): unknown {
+export function evalIf(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {
   const condition = toBoolean(evaluate(args[0], ctx));
   if (condition) {
     return evaluate(args[1], ctx);
@@ -73,6 +72,6 @@ export function evalIf(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContex
  * - false, 0, '', null, undefined, NaN are falsy
  * - Everything else is truthy
  */
-function toBoolean(value: unknown): boolean {
+function toBoolean(value: RuntimeValue): boolean {
   return Boolean(value);
 }

@@ -7,6 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import type { RuntimeValue } from '@almadar/core';
 import {
   createMinimalContext,
   createEffectContext,
@@ -221,7 +222,7 @@ describe('resolveBinding', () => {
 
   describe('local bindings', () => {
     it('resolves local variables', () => {
-      ctx.locals = new Map<string, unknown>([['temp', 42], ['name', 'local']]);
+      ctx.locals = new Map<string, RuntimeValue>([['temp', 42], ['name', 'local']]);
 
       expect(resolveBinding('@temp', ctx)).toBe(42);
       expect(resolveBinding('@name', ctx)).toBe('local');

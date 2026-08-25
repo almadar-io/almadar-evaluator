@@ -10,7 +10,8 @@
 import type { SExpr } from './types/expression.js';
 import { assertOperatorArity } from '@almadar/std/registry';
 import { isSExpr, isBinding, getOperator, getArgs } from './types/expression.js';
-import type { EvaluationContext } from './context.js';
+import type { EvaluationContext, Evaluator } from './context.js';
+import type { RuntimeValue } from '@almadar/core';
 import { resolveBinding } from './context.js';
 
 // Import operators
@@ -102,15 +103,17 @@ import * as stdNoise from './std/noise.js';
 import * as stdPath from './std/path.js';
 
 /**
- * JIT compilation cache for hot paths.
- * Maps S-expression JSON to compiled function.
+ * A compiled S-expression node: the operator impl and child closures are
+ * resolved once at compile time, so a firing pays zero dispatch, zero arity
+ * checks, and zero binding-path parsing.
  */
-const jitCache = new Map<string, (ctx: EvaluationContext) => unknown>();
+type CompiledFn = (ctx: EvaluationContext) => RuntimeValue;
 
 /**
- * Maximum JIT cache size to prevent memory issues.
+ * One operator implementation — the shared contract every `evalX` satisfies,
+ * including lazy forms (`if`/`let`/`fn` decide when to call `evaluate`).
  */
-const MAX_JIT_CACHE_SIZE = 1000;
+type OpImpl = (args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext) => RuntimeValue;
 
 /**
  * Sentinel returned by dispatchOperator when the head is not a registered
@@ -123,15 +126,422 @@ const UNKNOWN_OPERATOR = Symbol('unknown-operator');
  *
  * Provides runtime interpretation of S-expressions for guards, effects, and computed values.
  */
+/**
+ * The one op -> implementation mapping, shared by the interpreter's
+ * dispatchOperator and the tier-up compiler (arity is asserted by the
+ * caller: per dispatch when interpreting, once at compile time when compiled).
+ */
+const OPERATOR_TABLE: Record<string, OpImpl> = {
+  '+': evalAdd,
+  '-': evalSubtract,
+  '*': evalMultiply,
+  '/': evalDivide,
+  '%': evalModulo,
+  'abs': evalAbs,
+  'min': evalMin,
+  'max': evalMax,
+  'floor': evalFloor,
+  'ceil': evalCeil,
+  'round': evalRound,
+  'clamp': evalClamp,
+  '=': evalEqual,
+  '==': evalEqual,
+  '!=': evalNotEqual,
+  '<': evalLessThan,
+  '>': evalGreaterThan,
+  '<=': evalLessThanOrEqual,
+  '>=': evalGreaterThanOrEqual,
+  'matches': evalMatches,
+  'and': evalAnd,
+  'or': evalOr,
+  'not': evalNot,
+  'if': evalIf,
+  'let': evalLet,
+  'do': evalDo,
+  'when': evalWhen,
+  'fn': evalFn,
+  'lambda': evalFn,
+  'map': evalMap,
+  'filter': evalFilter,
+  'find': evalFind,
+  'count': evalCount,
+  'sum': evalSum,
+  'first': evalFirst,
+  'last': evalLast,
+  'nth': evalNth,
+  'concat': evalConcat,
+  'includes': evalIncludes,
+  'empty': evalEmpty,
+  'list': evalList,
+  'set': (args, evaluate, ctx) => { evalSet(args, evaluate, ctx); return undefined; },
+  'set-dynamic': (args, evaluate, ctx) => { evalSetDynamic(args, evaluate, ctx); return undefined; },
+  'increment': (args, evaluate, ctx) => { evalIncrement(args, evaluate, ctx); return undefined; },
+  'decrement': (args, evaluate, ctx) => { evalDecrement(args, evaluate, ctx); return undefined; },
+  'emit': (args, evaluate, ctx) => { evalEmit(args, evaluate, ctx); return undefined; },
+  'persist': (args, evaluate, ctx) => { evalPersist(args, evaluate, ctx); return undefined; },
+  'navigate': (args, evaluate, ctx) => { evalNavigate(args, evaluate, ctx); return undefined; },
+  'notify': (args, evaluate, ctx) => { evalNotify(args, evaluate, ctx); return undefined; },
+  'spawn': (args, evaluate, ctx) => { evalSpawn(args, evaluate, ctx); return undefined; },
+  'despawn': (args, evaluate, ctx) => { evalDespawn(args, evaluate, ctx); return undefined; },
+  'call-service': (args, evaluate, ctx) => { evalCallService(args, evaluate, ctx); return undefined; },
+  'render-ui': (args, evaluate, ctx) => { evalRenderUI(args, evaluate, ctx); return undefined; },
+  'ref': evalRef,
+  'deref': evalDeref,
+  'swap!': evalSwap,
+  'watch': (args, evaluate, ctx) => { evalWatch(args, evaluate, ctx); return undefined; },
+  'atomic': evalAtomic,
+  'math/abs': stdMath.evalMathAbs,
+  'math/min': stdMath.evalMathMin,
+  'math/max': stdMath.evalMathMax,
+  'math/clamp': stdMath.evalMathClamp,
+  'math/floor': stdMath.evalMathFloor,
+  'math/ceil': stdMath.evalMathCeil,
+  'math/round': stdMath.evalMathRound,
+  'math/pow': stdMath.evalMathPow,
+  'math/sqrt': stdMath.evalMathSqrt,
+  'math/mod': stdMath.evalMathMod,
+  'math/sign': stdMath.evalMathSign,
+  'math/lerp': stdMath.evalMathLerp,
+  'math/map': stdMath.evalMathMap,
+  'math/random': () => stdMath.evalMathRandom(),
+  'math/randomInt': stdMath.evalMathRandomInt,
+  'math/default': stdMath.evalMathDefault,
+  'math/sin': stdMath.evalMathSin,
+  'math/cos': stdMath.evalMathCos,
+  'math/tan': stdMath.evalMathTan,
+  'math/atan2': stdMath.evalMathAtan2,
+  'math/asin': stdMath.evalMathAsin,
+  'math/acos': stdMath.evalMathAcos,
+  'math/atan': stdMath.evalMathAtan,
+  'math/hypot': stdMath.evalMathHypot,
+  'math/deg-rad': stdMath.evalMathDegRad,
+  'math/rad-deg': stdMath.evalMathRadDeg,
+  'math/wrap': stdMath.evalMathWrap,
+  'math/approach': stdMath.evalMathApproach,
+  'vec/add': stdVec.evalVecAdd,
+  'vec/sub': stdVec.evalVecSub,
+  'vec/scale': stdVec.evalVecScale,
+  'vec/dot': stdVec.evalVecDot,
+  'vec/cross': stdVec.evalVecCross,
+  'vec/length': stdVec.evalVecLength,
+  'vec/length-sq': stdVec.evalVecLengthSq,
+  'vec/normalize': stdVec.evalVecNormalize,
+  'vec/distance': stdVec.evalVecDistance,
+  'vec/distance-sq': stdVec.evalVecDistanceSq,
+  'vec/lerp': stdVec.evalVecLerp,
+  'vec/angle': stdVec.evalVecAngle,
+  'vec/rotate': stdVec.evalVecRotate,
+  'vec/clamp-length': stdVec.evalVecClampLength,
+  'geo/aabb-overlap': stdGeo.evalGeoAabbOverlap,
+  'geo/circle-overlap': stdGeo.evalGeoCircleOverlap,
+  'geo/rect-circle-overlap': stdGeo.evalGeoRectCircleOverlap,
+  'geo/point-in-rect': stdGeo.evalGeoPointInRect,
+  'geo/point-in-circle': stdGeo.evalGeoPointInCircle,
+  'geo/reflect': stdGeo.evalGeoReflect,
+  'geo/segment-intersect': stdGeo.evalGeoSegmentIntersect,
+  'grid/to-world': stdGrid.evalGridToWorld,
+  'grid/from-world': stdGrid.evalGridFromWorld,
+  'grid/iso-to-screen': stdGrid.evalGridIsoToScreen,
+  'grid/screen-to-iso': stdGrid.evalGridScreenToIso,
+  'grid/distance': stdGrid.evalGridDistance,
+  'grid/manhattan-distance': stdGrid.evalGridManhattanDistance,
+  'grid/neighbors': stdGrid.evalGridNeighbors,
+  'grid/cells-in-radius': stdGrid.evalGridCellsInRadius,
+  'grid/line': stdGrid.evalGridLine,
+  'grid/in-bounds': stdGrid.evalGridInBounds,
+  'anim/frame-at': stdAnim.evalAnimFrameAt,
+  'anim/sheet-rect': stdAnim.evalAnimSheetRect,
+  'anim/direction-from-delta': stdAnim.evalAnimDirectionFromDelta,
+  'ease/apply': stdEase.evalEaseApply,
+  'ease/smoothstep': stdEase.evalEaseSmoothstep,
+  'noise/perlin': stdNoise.evalNoisePerlin,
+  'noise/simplex': stdNoise.evalNoiseSimplex,
+  'noise/fbm': stdNoise.evalNoiseFbm,
+  'path/astar': stdPath.evalPathAstar,
+  'path/reachable': stdPath.evalPathReachable,
+  'str/len': stdStr.evalStrLen,
+  'str/concat': stdStr.evalStrConcat,
+  'str/upper': stdStr.evalStrUpper,
+  'str/lower': stdStr.evalStrLower,
+  'str/trim': stdStr.evalStrTrim,
+  'str/trimStart': stdStr.evalStrTrimStart,
+  'str/trimEnd': stdStr.evalStrTrimEnd,
+  'str/split': stdStr.evalStrSplit,
+  'str/join': stdStr.evalStrJoin,
+  'str/slice': stdStr.evalStrSlice,
+  'str/replace': stdStr.evalStrReplace,
+  'str/replaceAll': stdStr.evalStrReplaceAll,
+  'str/includes': stdStr.evalStrIncludes,
+  'str/startsWith': stdStr.evalStrStartsWith,
+  'str/endsWith': stdStr.evalStrEndsWith,
+  'str/padStart': stdStr.evalStrPadStart,
+  'str/padEnd': stdStr.evalStrPadEnd,
+  'str/repeat': stdStr.evalStrRepeat,
+  'str/reverse': stdStr.evalStrReverse,
+  'str/capitalize': stdStr.evalStrCapitalize,
+  'str/titleCase': stdStr.evalStrTitleCase,
+  'str/camelCase': stdStr.evalStrCamelCase,
+  'str/kebabCase': stdStr.evalStrKebabCase,
+  'str/snakeCase': stdStr.evalStrSnakeCase,
+  'str/default': stdStr.evalStrDefault,
+  'str/template': stdStr.evalStrTemplate,
+  'str/truncate': stdStr.evalStrTruncate,
+  'to-string': (args, evaluate, ctx) => String(evaluate(args[0], ctx)),
+  'array/len': stdArray.evalArrayLen,
+  'array/range': stdArray.evalArrayRange,
+  'array/empty?': stdArray.evalArrayEmpty,
+  'array/first': stdArray.evalArrayFirst,
+  'array/last': stdArray.evalArrayLast,
+  'array/nth': stdArray.evalArrayNth,
+  'array/slice': stdArray.evalArraySlice,
+  'array/concat': stdArray.evalArrayConcat,
+  'array/append': stdArray.evalArrayAppend,
+  'array/prepend': stdArray.evalArrayPrepend,
+  'array/insert': stdArray.evalArrayInsert,
+  'array/remove': stdArray.evalArrayRemove,
+  'array/removeItem': stdArray.evalArrayRemoveItem,
+  'array/reverse': stdArray.evalArrayReverse,
+  'array/sort': stdArray.evalArraySort,
+  'array/shuffle': stdArray.evalArrayShuffle,
+  'array/unique': stdArray.evalArrayUnique,
+  'array/flatten': stdArray.evalArrayFlatten,
+  'array/zip': stdArray.evalArrayZip,
+  'array/includes': stdArray.evalArrayIncludes,
+  'array/indexOf': stdArray.evalArrayIndexOf,
+  'array/find': stdArray.evalArrayFind,
+  'array/findIndex': stdArray.evalArrayFindIndex,
+  'array/filter': stdArray.evalArrayFilter,
+  'array/reject': stdArray.evalArrayReject,
+  'array/map': stdArray.evalArrayMap,
+  'array/reduce': stdArray.evalArrayReduce,
+  'array/every': stdArray.evalArrayEvery,
+  'array/some': stdArray.evalArraySome,
+  'array/count': stdArray.evalArrayCount,
+  'array/sum': stdArray.evalArraySum,
+  'array/avg': stdArray.evalArrayAvg,
+  'array/min': stdArray.evalArrayMin,
+  'array/max': stdArray.evalArrayMax,
+  'array/groupBy': stdArray.evalArrayGroupBy,
+  'array/partition': stdArray.evalArrayPartition,
+  'array/take': stdArray.evalArrayTake,
+  'array/drop': stdArray.evalArrayDrop,
+  'array/takeLast': stdArray.evalArrayTakeLast,
+  'array/dropLast': stdArray.evalArrayDropLast,
+  'array/cosine': stdArray.evalArrayCosine,
+  'array/nearest': stdArray.evalArrayNearest,
+  'object/keys': stdObject.evalObjectKeys,
+  'object/values': stdObject.evalObjectValues,
+  'object/entries': stdObject.evalObjectEntries,
+  'object/fromEntries': stdObject.evalObjectFromEntries,
+  'object/get': stdObject.evalObjectGet,
+  'object/set': stdObject.evalObjectSet,
+  'object/has': stdObject.evalObjectHas,
+  'object/merge': stdObject.evalObjectMerge,
+  'object/deepMerge': stdObject.evalObjectDeepMerge,
+  'object/pick': stdObject.evalObjectPick,
+  'object/omit': stdObject.evalObjectOmit,
+  'object/mapValues': stdObject.evalObjectMapValues,
+  'object/mapKeys': stdObject.evalObjectMapKeys,
+  'object/filter': stdObject.evalObjectFilter,
+  'object/empty?': stdObject.evalObjectEmpty,
+  'object/equals': stdObject.evalObjectEquals,
+  'object/clone': stdObject.evalObjectClone,
+  'object/deepClone': stdObject.evalObjectDeepClone,
+  'path': stdObject.evalPath,
+  'validate/required': stdValidate.evalValidateRequired,
+  'validate/string': stdValidate.evalValidateString,
+  'validate/number': stdValidate.evalValidateNumber,
+  'validate/boolean': stdValidate.evalValidateBoolean,
+  'validate/array': stdValidate.evalValidateArray,
+  'validate/object': stdValidate.evalValidateObject,
+  'validate/email': stdValidate.evalValidateEmail,
+  'validate/url': stdValidate.evalValidateUrl,
+  'validate/uuid': stdValidate.evalValidateUuid,
+  'validate/phone': stdValidate.evalValidatePhone,
+  'validate/creditCard': stdValidate.evalValidateCreditCard,
+  'validate/date': stdValidate.evalValidateDate,
+  'validate/minLength': stdValidate.evalValidateMinLength,
+  'validate/maxLength': stdValidate.evalValidateMaxLength,
+  'validate/length': stdValidate.evalValidateLength,
+  'validate/min': stdValidate.evalValidateMin,
+  'validate/max': stdValidate.evalValidateMax,
+  'validate/range': stdValidate.evalValidateRange,
+  'validate/pattern': stdValidate.evalValidatePattern,
+  'validate/oneOf': stdValidate.evalValidateOneOf,
+  'validate/noneOf': stdValidate.evalValidateNoneOf,
+  'validate/equals': stdValidate.evalValidateEquals,
+  'validate/check': stdValidate.evalValidateCheck,
+  'time/now': () => stdTime.evalTimeNow(),
+  'time/today': () => stdTime.evalTimeToday(),
+  'time/parse': stdTime.evalTimeParse,
+  'time/format': stdTime.evalTimeFormat,
+  'time/year': stdTime.evalTimeYear,
+  'time/month': stdTime.evalTimeMonth,
+  'time/day': stdTime.evalTimeDay,
+  'time/weekday': stdTime.evalTimeWeekday,
+  'time/hour': stdTime.evalTimeHour,
+  'time/minute': stdTime.evalTimeMinute,
+  'time/second': stdTime.evalTimeSecond,
+  'time/add': stdTime.evalTimeAdd,
+  'time/subtract': stdTime.evalTimeSubtract,
+  'time/diff': stdTime.evalTimeDiff,
+  'time/startOf': stdTime.evalTimeStartOf,
+  'time/endOf': stdTime.evalTimeEndOf,
+  'time/isBefore': stdTime.evalTimeIsBefore,
+  'time/isAfter': stdTime.evalTimeIsAfter,
+  'time/isBetween': stdTime.evalTimeIsBetween,
+  'time/isSame': stdTime.evalTimeIsSame,
+  'time/isPast': stdTime.evalTimeIsPast,
+  'time/isFuture': stdTime.evalTimeIsFuture,
+  'time/isToday': stdTime.evalTimeIsToday,
+  'time/relative': stdTime.evalTimeRelative,
+  'time/duration': stdTime.evalTimeDuration,
+  'format/number': stdFormat.evalFormatNumber,
+  'format/currency': stdFormat.evalFormatCurrency,
+  'format/percent': stdFormat.evalFormatPercent,
+  'format/bytes': stdFormat.evalFormatBytes,
+  'format/ordinal': stdFormat.evalFormatOrdinal,
+  'format/plural': stdFormat.evalFormatPlural,
+  'format/list': stdFormat.evalFormatList,
+  'format/phone': stdFormat.evalFormatPhone,
+  'format/creditCard': stdFormat.evalFormatCreditCard,
+  'async/delay': stdAsync.evalAsyncDelay,
+  'async/interval': stdAsync.evalAsyncInterval,
+  'async/timeout': stdAsync.evalAsyncTimeout,
+  'async/debounce': (args, evaluate, ctx) => { stdAsync.evalAsyncDebounce(args, evaluate, ctx); return undefined; },
+  'async/throttle': (args, evaluate, ctx) => { stdAsync.evalAsyncThrottle(args, evaluate, ctx); return undefined; },
+  'async/retry': stdAsync.evalAsyncRetry,
+  'async/race': stdAsync.evalAsyncRace,
+  'async/all': stdAsync.evalAsyncAll,
+  'async/sequence': stdAsync.evalAsyncSequence,
+  'prob/seed': (args, evaluate, ctx) => { stdProb.evalProbSeed(args, evaluate, ctx); return undefined; },
+  'prob/flip': stdProb.evalProbFlip,
+  'prob/gaussian': stdProb.evalProbGaussian,
+  'prob/uniform': stdProb.evalProbUniform,
+  'prob/beta': stdProb.evalProbBeta,
+  'prob/categorical': stdProb.evalProbCategorical,
+  'prob/poisson': stdProb.evalProbPoisson,
+  'prob/condition': (args, evaluate, ctx) => { stdProb.evalProbCondition(args, evaluate, ctx); return undefined; },
+  'prob/sample': stdProb.evalProbSample,
+  'prob/posterior': stdProb.evalProbPosterior,
+  'prob/infer': stdProb.evalProbInfer,
+  'prob/expected-value': stdProb.evalProbExpectedValue,
+  'prob/variance': stdProb.evalProbVariance,
+  'prob/histogram': stdProb.evalProbHistogram,
+  'prob/percentile': stdProb.evalProbPercentile,
+  'prob/credible-interval': stdProb.evalProbCredibleInterval,
+  'os/watch-files': (args, evaluate, ctx) => { stdOs.evalOsWatchFiles(args, evaluate, ctx); return undefined; },
+  'os/watch-process': (args, evaluate, ctx) => { stdOs.evalOsWatchProcess(args, evaluate, ctx); return undefined; },
+  'os/watch-port': (args, evaluate, ctx) => { stdOs.evalOsWatchPort(args, evaluate, ctx); return undefined; },
+  'os/watch-http': (args, evaluate, ctx) => { stdOs.evalOsWatchHttp(args, evaluate, ctx); return undefined; },
+  'os/watch-cron': (args, evaluate, ctx) => { stdOs.evalOsWatchCron(args, evaluate, ctx); return undefined; },
+  'os/watch-signal': (args, evaluate, ctx) => { stdOs.evalOsWatchSignal(args, evaluate, ctx); return undefined; },
+  'os/watch-env': (args, evaluate, ctx) => { stdOs.evalOsWatchEnv(args, evaluate, ctx); return undefined; },
+  'os/debounce': (args, evaluate, ctx) => { stdOs.evalOsDebounce(args, evaluate, ctx); return undefined; },
+  'llm/generate': stdLlm.evalLlmGenerate,
+  'llm/call-tools': stdLlm.evalLlmCallTools,
+  'llm/embed': stdLlm.evalLlmEmbed,
+  'llm/token-count': stdLlm.evalLlmTokenCount,
+  'llm/switch': stdLlm.evalLlmSwitch,
+  'llm/compact': stdLlm.evalLlmCompact,
+  'workspace/read-orbital': stdWorkspace.evalWorkspaceReadOrbital,
+  'workspace/write-orbital': stdWorkspace.evalWorkspaceWriteOrbital,
+  'workspace/read-file': stdWorkspace.evalWorkspaceReadFile,
+  'workspace/write-file': stdWorkspace.evalWorkspaceWriteFile,
+  'workspace/exists': stdWorkspace.evalWorkspaceExists,
+  'workspace/list-orbitals': stdWorkspace.evalWorkspaceListOrbitals,
+  'workspace/read-schema': stdWorkspace.evalWorkspaceReadSchema,
+  'workspace/write-schema': stdWorkspace.evalWorkspaceWriteSchema,
+  'workspace/read-plan': stdWorkspace.evalWorkspaceReadPlan,
+  'workspace/write-plan': stdWorkspace.evalWorkspaceWritePlan,
+  'workspace/archive-orbital': stdWorkspace.evalWorkspaceArchiveOrbital,
+  'session/read-spec': stdSession.evalSessionReadSpec,
+  'session/write-spec': stdSession.evalSessionWriteSpec,
+  'session/read-memory': stdSession.evalSessionReadMemory,
+  'session/write-memory': stdSession.evalSessionWriteMemory,
+  'session/read-history': stdSession.evalSessionReadHistory,
+  'session/append-history': stdSession.evalSessionAppendHistory,
+  'session/read-errors': stdSession.evalSessionReadErrors,
+  'session/write-errors': stdSession.evalSessionWriteErrors,
+  'session/read-analysis': stdSession.evalSessionReadAnalysis,
+  'memory/recall': stdMemory.evalMemoryRecall,
+  'memory/store': stdMemory.evalMemoryStore,
+  'memory/list': stdMemory.evalMemoryList,
+  'trace/emit': stdTrace.evalTraceEmit,
+  'trace/log': stdTrace.evalTraceLog,
+  'integration/http': stdIntegration.evalIntegrationHttp,
+  'integration/github-get-repo': stdIntegration.evalIntegrationGithubGetRepo,
+  'integration/github-create-issue': stdIntegration.evalIntegrationGithubCreateIssue,
+  'contract/validate-input': stdContract.evalContractValidateInput,
+  'contract/validate-output': stdContract.evalContractValidateOutput,
+  'contract/clamp-output': stdContract.evalContractClampOutput,
+  'contract/violations': stdContract.evalContractViolations,
+  'contract/entity-to-tensor': stdContract.evalContractEntityToTensor,
+  'contract/tensor-to-payload': stdContract.evalContractTensorToPayload,
+  'graph/from-entities': stdGraph.evalGraphFromEntities,
+  'graph/from-adjacency': stdGraph.evalGraphFromAdjacency,
+  'graph/from-edge-list': stdGraph.evalGraphFromEdgeList,
+  'graph/add-self-loops': stdGraph.evalGraphAddSelfLoops,
+  'graph/to-undirected': stdGraph.evalGraphToUndirected,
+  'graph/subgraph': stdGraph.evalGraphSubgraph,
+  'graph/k-hop': stdGraph.evalGraphKHop,
+  'graph/node-features': stdGraph.evalGraphNodeFeatures,
+  'graph/edge-index': stdGraph.evalGraphEdgeIndex,
+  'graph/edge-features': stdGraph.evalGraphEdgeFeatures,
+  'graph/num-nodes': stdGraph.evalGraphNumNodes,
+  'graph/num-edges': stdGraph.evalGraphNumEdges,
+  'graph/degree': stdGraph.evalGraphDegree,
+  'graph/batch': stdGraph.evalGraphBatch,
+  'data/dataset': stdData.evalDataDataset,
+  'data/dataloader': stdData.evalDataDataloader,
+  'data/split': stdData.evalDataSplit,
+  'data/normalize': stdData.evalDataNormalize,
+  'data/augment': stdData.evalDataAugment,
+  'data/tokenize': stdData.evalDataTokenize,
+  'data/pad': stdData.evalDataPad,
+};
+
 export class SExpressionEvaluator {
   /**
+   * Tier-up compilation cache, keyed by node IDENTITY: schema trees are
+   * long-lived parsed objects, so a WeakMap costs no key serialization and
+   * is collected with the schema. First sight of a node interprets it and
+   * marks it seen; the second sight compiles it — one-off dynamically built
+   * expressions never pay compile cost.
+   */
+  private compileCache = new WeakMap<object, true | CompiledFn>();
+
+  /** Single bound interpreter handed to operator impls — was allocated per dispatch. */
+  private readonly boundInterpret: Evaluator = (expr, c) => this.interpret(expr, c);
+
+  /**
    * Evaluate an S-expression in the given context.
+   * Hot trees promote to compiled closures on second use; everything else
+   * runs through the interpreter.
    *
    * @param expr - S-expression to evaluate
    * @param ctx - Evaluation context with bindings and effect handlers
    * @returns Result of evaluation
    */
-  evaluate(expr: SExpr, ctx: EvaluationContext): unknown {
+  evaluate(expr: SExpr, ctx: EvaluationContext): RuntimeValue {
+    if (typeof expr === 'object' && expr !== null) {
+      const entry = this.compileCache.get(expr);
+      if (typeof entry === 'function') return entry(ctx);
+      if (entry === true) {
+        const fn = this.compileNode(expr, new Map(), undefined);
+        this.compileCache.set(expr, fn);
+        return fn(ctx);
+      }
+      this.compileCache.set(expr, true);
+    }
+    return this.interpret(expr, ctx);
+  }
+
+  /**
+   * The tree-walking interpreter of record — first-use path and the
+   * compiler's fallback for foreign subtrees.
+   */
+  private interpret(expr: SExpr, ctx: EvaluationContext): RuntimeValue {
     // Atom: literal value
     if (!isSExpr(expr)) {
       // Check if it's a binding
@@ -146,8 +556,8 @@ export class SExpressionEvaluator {
       // Without this, the evaluator returns the raw SExpression and the
       // UI renders the lolo source as text.
       if (this.isPlainObject(expr)) {
-        const out: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(expr as Record<string, unknown>)) {
+        const out: Record<string, RuntimeValue> = {};
+        for (const [k, v] of Object.entries(expr as Record<string, RuntimeValue>)) {
           out[k] = this.evaluate(v as SExpr, ctx);
         }
         return out;
@@ -182,7 +592,65 @@ export class SExpressionEvaluator {
     return result;
   }
 
-  private isPlainObject(value: unknown): value is Record<string, unknown> {
+  /**
+   * Compile one tree into composed closures. Every node of the tree is
+   * registered in `into` so the impls' `evaluate` callback (childDispatch)
+   * resolves in-tree children by identity and falls back to interpretation
+   * only for foreign subtrees. Arity is asserted HERE, once — a tree that
+   * compiles never re-validates.
+   */
+  private compileNode(expr: SExpr, into: Map<SExpr, CompiledFn>, childDispatch: Evaluator | undefined): CompiledFn {
+    const dispatch: Evaluator = childDispatch ?? ((e, c) => {
+      const f = into.get(e);
+      return f !== undefined ? f(c) : this.interpret(e, c);
+    });
+
+    let fn: CompiledFn;
+    if (!isSExpr(expr)) {
+      if (isBinding(expr)) {
+        fn = (ctx) => resolveBinding(expr, ctx);
+      } else if (this.isPlainObject(expr)) {
+        const entries = Object.entries(expr as Record<string, SExpr>).map(
+          ([k, v]) => [k, this.compileNode(v, into, dispatch)] as const,
+        );
+        fn = (ctx) => {
+          const out: Record<string, RuntimeValue> = {};
+          for (const [k, f] of entries) out[k] = f(ctx);
+          return out;
+        };
+      } else if (Array.isArray(expr)) {
+        const items = expr.map((item) => this.compileNode(item as SExpr, into, dispatch));
+        fn = (ctx) => items.map((f) => f(ctx));
+      } else {
+        fn = () => expr;
+      }
+    } else {
+      const op = getOperator(expr)!;
+      const args = getArgs(expr);
+      // Arity before the table lookup — same order as dispatchOperator, so a
+      // registry-registered but undispatched head throws identically on both
+      // paths (assertOperatorArity no-ops on unregistered ops).
+      assertOperatorArity(op, args.length);
+      const impl = OPERATOR_TABLE[op];
+      // Children are compiled either way: the data-array fallback reduces
+      // the whole array (operator head included — a constant string).
+      for (const item of expr) {
+        if (!into.has(item as SExpr)) this.compileNode(item as SExpr, into, dispatch);
+      }
+      if (impl === undefined) {
+        fn = (ctx) => (expr as SExpr[]).map((item) => {
+          const f = into.get(item as SExpr);
+          return f !== undefined ? f(ctx) : this.interpret(item as SExpr, ctx);
+        });
+      } else {
+        fn = (ctx) => impl(args, dispatch, ctx);
+      }
+    }
+    into.set(expr, fn);
+    return fn;
+  }
+
+  private isPlainObject(value: RuntimeValue): value is Record<string, RuntimeValue> {
     return (
       typeof value === 'object' &&
       value !== null &&
@@ -228,860 +696,45 @@ export class SExpressionEvaluator {
 
   /**
    * Compile an S-expression to a function for faster repeated evaluation.
-   * Uses a cache to avoid recompilation.
+   * Same machinery as the automatic tier-up in `evaluate`; explicit callers
+   * promote immediately instead of on second use.
    *
    * @param expr - S-expression to compile
    * @returns Function that evaluates the expression given a context
    */
-  compile(expr: SExpr): (ctx: EvaluationContext) => unknown {
-    const key = JSON.stringify(expr);
-
-    // Check cache
-    const cached = jitCache.get(key);
-    if (cached) {
-      return cached;
+  compile(expr: SExpr): CompiledFn {
+    if (typeof expr === 'object' && expr !== null) {
+      const entry = this.compileCache.get(expr);
+      if (typeof entry === 'function') return entry;
+      const fn = this.compileNode(expr, new Map(), undefined);
+      this.compileCache.set(expr, fn);
+      return fn;
     }
-
-    // Compile to function
-    const fn = (ctx: EvaluationContext) => this.evaluate(expr, ctx);
-
-    // Add to cache (with size limit)
-    if (jitCache.size >= MAX_JIT_CACHE_SIZE) {
-      // Remove oldest entry (first key)
-      const firstKey = jitCache.keys().next().value;
-      if (firstKey) {
-        jitCache.delete(firstKey);
-      }
-    }
-    jitCache.set(key, fn);
-
-    return fn;
+    return this.compileNode(expr, new Map(), undefined);
   }
 
   /**
-   * Clear the JIT compilation cache.
+   * Clear the compilation cache.
    */
   clearCache(): void {
-    jitCache.clear();
+    this.compileCache = new WeakMap();
   }
 
   /**
    * Dispatch to the appropriate operator implementation.
    */
-  private dispatchOperator(op: string, args: SExpr[], ctx: EvaluationContext): unknown {
+  /**
+   * Dispatch to the appropriate operator implementation.
+   */
+  private dispatchOperator(op: string, args: SExpr[], ctx: EvaluationContext): RuntimeValue {
     // Parity with the compiled path's `resolve_sexpr_call`: a registered
     // operator applied outside its canonical arity bounds throws instead of
     // silently truncating/wrapping (R-EVALUATOR-NO-ARITY-CHECK). Unregistered
     // heads fall through to the data-array handling unchanged.
     assertOperatorArity(op, args.length);
-
-    // Bind evaluate method for passing to operator implementations
-    const evaluate = (expr: SExpr, c: EvaluationContext) => this.evaluate(expr, c);
-
-    switch (op) {
-      // Arithmetic
-      case '+':
-        return evalAdd(args, evaluate, ctx);
-      case '-':
-        return evalSubtract(args, evaluate, ctx);
-      case '*':
-        return evalMultiply(args, evaluate, ctx);
-      case '/':
-        return evalDivide(args, evaluate, ctx);
-      case '%':
-        return evalModulo(args, evaluate, ctx);
-      case 'abs':
-        return evalAbs(args, evaluate, ctx);
-      case 'min':
-        return evalMin(args, evaluate, ctx);
-      case 'max':
-        return evalMax(args, evaluate, ctx);
-      case 'floor':
-        return evalFloor(args, evaluate, ctx);
-      case 'ceil':
-        return evalCeil(args, evaluate, ctx);
-      case 'round':
-        return evalRound(args, evaluate, ctx);
-      case 'clamp':
-        return evalClamp(args, evaluate, ctx);
-
-      // Comparison
-      case '=':
-      case '==':
-        return evalEqual(args, evaluate, ctx);
-      case '!=':
-        return evalNotEqual(args, evaluate, ctx);
-      case '<':
-        return evalLessThan(args, evaluate, ctx);
-      case '>':
-        return evalGreaterThan(args, evaluate, ctx);
-      case '<=':
-        return evalLessThanOrEqual(args, evaluate, ctx);
-      case '>=':
-        return evalGreaterThanOrEqual(args, evaluate, ctx);
-      case 'matches':
-        return evalMatches(args, evaluate, ctx);
-
-      // Logic
-      case 'and':
-        return evalAnd(args, evaluate, ctx);
-      case 'or':
-        return evalOr(args, evaluate, ctx);
-      case 'not':
-        return evalNot(args, evaluate, ctx);
-      case 'if':
-        return evalIf(args, evaluate, ctx);
-
-      // Control
-      case 'let':
-        return evalLet(args, evaluate, ctx);
-      case 'do':
-        return evalDo(args, evaluate, ctx);
-      case 'when':
-        return evalWhen(args, evaluate, ctx);
-      case 'fn':
-      case 'lambda':
-        return evalFn(args, evaluate, ctx);
-
-      // Collections
-      case 'map':
-        return evalMap(args, evaluate, ctx);
-      case 'filter':
-        return evalFilter(args, evaluate, ctx);
-      case 'find':
-        return evalFind(args, evaluate, ctx);
-      case 'count':
-        return evalCount(args, evaluate, ctx);
-      case 'sum':
-        return evalSum(args, evaluate, ctx);
-      case 'first':
-        return evalFirst(args, evaluate, ctx);
-      case 'last':
-        return evalLast(args, evaluate, ctx);
-      case 'nth':
-        return evalNth(args, evaluate, ctx);
-      case 'concat':
-        return evalConcat(args, evaluate, ctx);
-      case 'includes':
-        return evalIncludes(args, evaluate, ctx);
-      case 'empty':
-        return evalEmpty(args, evaluate, ctx);
-      case 'list':
-        return evalList(args, evaluate, ctx);
-
-      // Effects
-      case 'set':
-        evalSet(args, evaluate, ctx);
-        return undefined;
-      case 'set-dynamic':
-        evalSetDynamic(args, evaluate, ctx);
-        return undefined;
-      case 'increment':
-        evalIncrement(args, evaluate, ctx);
-        return undefined;
-      case 'decrement':
-        evalDecrement(args, evaluate, ctx);
-        return undefined;
-      case 'emit':
-        evalEmit(args, evaluate, ctx);
-        return undefined;
-      case 'persist':
-        evalPersist(args, evaluate, ctx);
-        return undefined;
-      case 'navigate':
-        evalNavigate(args, evaluate, ctx);
-        return undefined;
-      case 'notify':
-        evalNotify(args, evaluate, ctx);
-        return undefined;
-      case 'spawn':
-        evalSpawn(args, evaluate, ctx);
-        return undefined;
-      case 'despawn':
-        evalDespawn(args, evaluate, ctx);
-        return undefined;
-      case 'call-service':
-        evalCallService(args, evaluate, ctx);
-        return undefined;
-      case 'render-ui':
-        evalRenderUI(args, evaluate, ctx);
-        return undefined;
-
-      // Resource operators
-      case 'ref':
-        return evalRef(args, evaluate, ctx);
-      case 'deref':
-        return evalDeref(args, evaluate, ctx);
-      case 'swap!':
-        return evalSwap(args, evaluate, ctx);
-      case 'watch':
-        evalWatch(args, evaluate, ctx);
-        return undefined;
-      case 'atomic':
-        return evalAtomic(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: math/*
-      // ===============================
-      case 'math/abs':
-        return stdMath.evalMathAbs(args, evaluate, ctx);
-      case 'math/min':
-        return stdMath.evalMathMin(args, evaluate, ctx);
-      case 'math/max':
-        return stdMath.evalMathMax(args, evaluate, ctx);
-      case 'math/clamp':
-        return stdMath.evalMathClamp(args, evaluate, ctx);
-      case 'math/floor':
-        return stdMath.evalMathFloor(args, evaluate, ctx);
-      case 'math/ceil':
-        return stdMath.evalMathCeil(args, evaluate, ctx);
-      case 'math/round':
-        return stdMath.evalMathRound(args, evaluate, ctx);
-      case 'math/pow':
-        return stdMath.evalMathPow(args, evaluate, ctx);
-      case 'math/sqrt':
-        return stdMath.evalMathSqrt(args, evaluate, ctx);
-      case 'math/mod':
-        return stdMath.evalMathMod(args, evaluate, ctx);
-      case 'math/sign':
-        return stdMath.evalMathSign(args, evaluate, ctx);
-      case 'math/lerp':
-        return stdMath.evalMathLerp(args, evaluate, ctx);
-      case 'math/map':
-        return stdMath.evalMathMap(args, evaluate, ctx);
-      case 'math/random':
-        return stdMath.evalMathRandom();
-      case 'math/randomInt':
-        return stdMath.evalMathRandomInt(args, evaluate, ctx);
-      case 'math/default':
-        return stdMath.evalMathDefault(args, evaluate, ctx);
-      case 'math/sin':
-        return stdMath.evalMathSin(args, evaluate, ctx);
-      case 'math/cos':
-        return stdMath.evalMathCos(args, evaluate, ctx);
-      case 'math/tan':
-        return stdMath.evalMathTan(args, evaluate, ctx);
-      case 'math/atan2':
-        return stdMath.evalMathAtan2(args, evaluate, ctx);
-      case 'math/asin':
-        return stdMath.evalMathAsin(args, evaluate, ctx);
-      case 'math/acos':
-        return stdMath.evalMathAcos(args, evaluate, ctx);
-      case 'math/atan':
-        return stdMath.evalMathAtan(args, evaluate, ctx);
-      case 'math/hypot':
-        return stdMath.evalMathHypot(args, evaluate, ctx);
-      case 'math/deg-rad':
-        return stdMath.evalMathDegRad(args, evaluate, ctx);
-      case 'math/rad-deg':
-        return stdMath.evalMathRadDeg(args, evaluate, ctx);
-      case 'math/wrap':
-        return stdMath.evalMathWrap(args, evaluate, ctx);
-      case 'math/approach':
-        return stdMath.evalMathApproach(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: vec/*
-      // ===============================
-      case 'vec/add':
-        return stdVec.evalVecAdd(args, evaluate, ctx);
-      case 'vec/sub':
-        return stdVec.evalVecSub(args, evaluate, ctx);
-      case 'vec/scale':
-        return stdVec.evalVecScale(args, evaluate, ctx);
-      case 'vec/dot':
-        return stdVec.evalVecDot(args, evaluate, ctx);
-      case 'vec/cross':
-        return stdVec.evalVecCross(args, evaluate, ctx);
-      case 'vec/length':
-        return stdVec.evalVecLength(args, evaluate, ctx);
-      case 'vec/length-sq':
-        return stdVec.evalVecLengthSq(args, evaluate, ctx);
-      case 'vec/normalize':
-        return stdVec.evalVecNormalize(args, evaluate, ctx);
-      case 'vec/distance':
-        return stdVec.evalVecDistance(args, evaluate, ctx);
-      case 'vec/distance-sq':
-        return stdVec.evalVecDistanceSq(args, evaluate, ctx);
-      case 'vec/lerp':
-        return stdVec.evalVecLerp(args, evaluate, ctx);
-      case 'vec/angle':
-        return stdVec.evalVecAngle(args, evaluate, ctx);
-      case 'vec/rotate':
-        return stdVec.evalVecRotate(args, evaluate, ctx);
-      case 'vec/clamp-length':
-        return stdVec.evalVecClampLength(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: geo/*
-      // ===============================
-      case 'geo/aabb-overlap':
-        return stdGeo.evalGeoAabbOverlap(args, evaluate, ctx);
-      case 'geo/circle-overlap':
-        return stdGeo.evalGeoCircleOverlap(args, evaluate, ctx);
-      case 'geo/rect-circle-overlap':
-        return stdGeo.evalGeoRectCircleOverlap(args, evaluate, ctx);
-      case 'geo/point-in-rect':
-        return stdGeo.evalGeoPointInRect(args, evaluate, ctx);
-      case 'geo/point-in-circle':
-        return stdGeo.evalGeoPointInCircle(args, evaluate, ctx);
-      case 'geo/reflect':
-        return stdGeo.evalGeoReflect(args, evaluate, ctx);
-      case 'geo/segment-intersect':
-        return stdGeo.evalGeoSegmentIntersect(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: grid/*
-      // ===============================
-      case 'grid/to-world':
-        return stdGrid.evalGridToWorld(args, evaluate, ctx);
-      case 'grid/from-world':
-        return stdGrid.evalGridFromWorld(args, evaluate, ctx);
-      case 'grid/iso-to-screen':
-        return stdGrid.evalGridIsoToScreen(args, evaluate, ctx);
-      case 'grid/screen-to-iso':
-        return stdGrid.evalGridScreenToIso(args, evaluate, ctx);
-      case 'grid/distance':
-        return stdGrid.evalGridDistance(args, evaluate, ctx);
-      case 'grid/manhattan-distance':
-        return stdGrid.evalGridManhattanDistance(args, evaluate, ctx);
-      case 'grid/neighbors':
-        return stdGrid.evalGridNeighbors(args, evaluate, ctx);
-      case 'grid/cells-in-radius':
-        return stdGrid.evalGridCellsInRadius(args, evaluate, ctx);
-      case 'grid/line':
-        return stdGrid.evalGridLine(args, evaluate, ctx);
-      case 'grid/in-bounds':
-        return stdGrid.evalGridInBounds(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: anim/*
-      // ===============================
-      case 'anim/frame-at':
-        return stdAnim.evalAnimFrameAt(args, evaluate, ctx);
-      case 'anim/sheet-rect':
-        return stdAnim.evalAnimSheetRect(args, evaluate, ctx);
-      case 'anim/direction-from-delta':
-        return stdAnim.evalAnimDirectionFromDelta(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: ease/*
-      // ===============================
-      case 'ease/apply':
-        return stdEase.evalEaseApply(args, evaluate, ctx);
-      case 'ease/smoothstep':
-        return stdEase.evalEaseSmoothstep(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: noise/*
-      // ===============================
-      case 'noise/perlin':
-        return stdNoise.evalNoisePerlin(args, evaluate, ctx);
-      case 'noise/simplex':
-        return stdNoise.evalNoiseSimplex(args, evaluate, ctx);
-      case 'noise/fbm':
-        return stdNoise.evalNoiseFbm(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: path/*
-      // ===============================
-      case 'path/astar':
-        return stdPath.evalPathAstar(args, evaluate, ctx);
-      case 'path/reachable':
-        return stdPath.evalPathReachable(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: str/*
-      // ===============================
-      case 'str/len':
-        return stdStr.evalStrLen(args, evaluate, ctx);
-      case 'str/concat':
-        return stdStr.evalStrConcat(args, evaluate, ctx);
-      case 'str/upper':
-        return stdStr.evalStrUpper(args, evaluate, ctx);
-      case 'str/lower':
-        return stdStr.evalStrLower(args, evaluate, ctx);
-      case 'str/trim':
-        return stdStr.evalStrTrim(args, evaluate, ctx);
-      case 'str/trimStart':
-        return stdStr.evalStrTrimStart(args, evaluate, ctx);
-      case 'str/trimEnd':
-        return stdStr.evalStrTrimEnd(args, evaluate, ctx);
-      case 'str/split':
-        return stdStr.evalStrSplit(args, evaluate, ctx);
-      case 'str/join':
-        return stdStr.evalStrJoin(args, evaluate, ctx);
-      case 'str/slice':
-        return stdStr.evalStrSlice(args, evaluate, ctx);
-      case 'str/replace':
-        return stdStr.evalStrReplace(args, evaluate, ctx);
-      case 'str/replaceAll':
-        return stdStr.evalStrReplaceAll(args, evaluate, ctx);
-      case 'str/includes':
-        return stdStr.evalStrIncludes(args, evaluate, ctx);
-      case 'str/startsWith':
-        return stdStr.evalStrStartsWith(args, evaluate, ctx);
-      case 'str/endsWith':
-        return stdStr.evalStrEndsWith(args, evaluate, ctx);
-      case 'str/padStart':
-        return stdStr.evalStrPadStart(args, evaluate, ctx);
-      case 'str/padEnd':
-        return stdStr.evalStrPadEnd(args, evaluate, ctx);
-      case 'str/repeat':
-        return stdStr.evalStrRepeat(args, evaluate, ctx);
-      case 'str/reverse':
-        return stdStr.evalStrReverse(args, evaluate, ctx);
-      case 'str/capitalize':
-        return stdStr.evalStrCapitalize(args, evaluate, ctx);
-      case 'str/titleCase':
-        return stdStr.evalStrTitleCase(args, evaluate, ctx);
-      case 'str/camelCase':
-        return stdStr.evalStrCamelCase(args, evaluate, ctx);
-      case 'str/kebabCase':
-        return stdStr.evalStrKebabCase(args, evaluate, ctx);
-      case 'str/snakeCase':
-        return stdStr.evalStrSnakeCase(args, evaluate, ctx);
-      case 'str/default':
-        return stdStr.evalStrDefault(args, evaluate, ctx);
-      case 'str/template':
-        return stdStr.evalStrTemplate(args, evaluate, ctx);
-      case 'str/truncate':
-        return stdStr.evalStrTruncate(args, evaluate, ctx);
-      case 'to-string':
-        return String(evaluate(args[0], ctx));
-
-      // ===============================
-      // Standard Library: array/*
-      // ===============================
-      case 'array/len':
-        return stdArray.evalArrayLen(args, evaluate, ctx);
-      case 'array/range':
-        return stdArray.evalArrayRange(args, evaluate, ctx);
-      case 'array/empty?':
-        return stdArray.evalArrayEmpty(args, evaluate, ctx);
-      case 'array/first':
-        return stdArray.evalArrayFirst(args, evaluate, ctx);
-      case 'array/last':
-        return stdArray.evalArrayLast(args, evaluate, ctx);
-      case 'array/nth':
-        return stdArray.evalArrayNth(args, evaluate, ctx);
-      case 'array/slice':
-        return stdArray.evalArraySlice(args, evaluate, ctx);
-      case 'array/concat':
-        return stdArray.evalArrayConcat(args, evaluate, ctx);
-      case 'array/append':
-        return stdArray.evalArrayAppend(args, evaluate, ctx);
-      case 'array/prepend':
-        return stdArray.evalArrayPrepend(args, evaluate, ctx);
-      case 'array/insert':
-        return stdArray.evalArrayInsert(args, evaluate, ctx);
-      case 'array/remove':
-        return stdArray.evalArrayRemove(args, evaluate, ctx);
-      case 'array/removeItem':
-        return stdArray.evalArrayRemoveItem(args, evaluate, ctx);
-      case 'array/reverse':
-        return stdArray.evalArrayReverse(args, evaluate, ctx);
-      case 'array/sort':
-        return stdArray.evalArraySort(args, evaluate, ctx);
-      case 'array/shuffle':
-        return stdArray.evalArrayShuffle(args, evaluate, ctx);
-      case 'array/unique':
-        return stdArray.evalArrayUnique(args, evaluate, ctx);
-      case 'array/flatten':
-        return stdArray.evalArrayFlatten(args, evaluate, ctx);
-      case 'array/zip':
-        return stdArray.evalArrayZip(args, evaluate, ctx);
-      case 'array/includes':
-        return stdArray.evalArrayIncludes(args, evaluate, ctx);
-      case 'array/indexOf':
-        return stdArray.evalArrayIndexOf(args, evaluate, ctx);
-      case 'array/find':
-        return stdArray.evalArrayFind(args, evaluate, ctx);
-      case 'array/findIndex':
-        return stdArray.evalArrayFindIndex(args, evaluate, ctx);
-      case 'array/filter':
-        return stdArray.evalArrayFilter(args, evaluate, ctx);
-      case 'array/reject':
-        return stdArray.evalArrayReject(args, evaluate, ctx);
-      case 'array/map':
-        return stdArray.evalArrayMap(args, evaluate, ctx);
-      case 'array/reduce':
-        return stdArray.evalArrayReduce(args, evaluate, ctx);
-      case 'array/every':
-        return stdArray.evalArrayEvery(args, evaluate, ctx);
-      case 'array/some':
-        return stdArray.evalArraySome(args, evaluate, ctx);
-      case 'array/count':
-        return stdArray.evalArrayCount(args, evaluate, ctx);
-      case 'array/sum':
-        return stdArray.evalArraySum(args, evaluate, ctx);
-      case 'array/avg':
-        return stdArray.evalArrayAvg(args, evaluate, ctx);
-      case 'array/min':
-        return stdArray.evalArrayMin(args, evaluate, ctx);
-      case 'array/max':
-        return stdArray.evalArrayMax(args, evaluate, ctx);
-      case 'array/groupBy':
-        return stdArray.evalArrayGroupBy(args, evaluate, ctx);
-      case 'array/partition':
-        return stdArray.evalArrayPartition(args, evaluate, ctx);
-      case 'array/take':
-        return stdArray.evalArrayTake(args, evaluate, ctx);
-      case 'array/drop':
-        return stdArray.evalArrayDrop(args, evaluate, ctx);
-      case 'array/takeLast':
-        return stdArray.evalArrayTakeLast(args, evaluate, ctx);
-      case 'array/dropLast':
-        return stdArray.evalArrayDropLast(args, evaluate, ctx);
-      case 'array/cosine':
-        return stdArray.evalArrayCosine(args, evaluate, ctx);
-      case 'array/nearest':
-        return stdArray.evalArrayNearest(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: object/*
-      // ===============================
-      case 'object/keys':
-        return stdObject.evalObjectKeys(args, evaluate, ctx);
-      case 'object/values':
-        return stdObject.evalObjectValues(args, evaluate, ctx);
-      case 'object/entries':
-        return stdObject.evalObjectEntries(args, evaluate, ctx);
-      case 'object/fromEntries':
-        return stdObject.evalObjectFromEntries(args, evaluate, ctx);
-      case 'object/get':
-        return stdObject.evalObjectGet(args, evaluate, ctx);
-      case 'object/set':
-        return stdObject.evalObjectSet(args, evaluate, ctx);
-      case 'object/has':
-        return stdObject.evalObjectHas(args, evaluate, ctx);
-      case 'object/merge':
-        return stdObject.evalObjectMerge(args, evaluate, ctx);
-      case 'object/deepMerge':
-        return stdObject.evalObjectDeepMerge(args, evaluate, ctx);
-      case 'object/pick':
-        return stdObject.evalObjectPick(args, evaluate, ctx);
-      case 'object/omit':
-        return stdObject.evalObjectOmit(args, evaluate, ctx);
-      case 'object/mapValues':
-        return stdObject.evalObjectMapValues(args, evaluate, ctx);
-      case 'object/mapKeys':
-        return stdObject.evalObjectMapKeys(args, evaluate, ctx);
-      case 'object/filter':
-        return stdObject.evalObjectFilter(args, evaluate, ctx);
-      case 'object/empty?':
-        return stdObject.evalObjectEmpty(args, evaluate, ctx);
-      case 'object/equals':
-        return stdObject.evalObjectEquals(args, evaluate, ctx);
-      case 'object/clone':
-        return stdObject.evalObjectClone(args, evaluate, ctx);
-      case 'object/deepClone':
-        return stdObject.evalObjectDeepClone(args, evaluate, ctx);
-
-      // Path operator (for dynamic field access)
-      case 'path':
-        return stdObject.evalPath(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: validate/*
-      // ===============================
-      case 'validate/required':
-        return stdValidate.evalValidateRequired(args, evaluate, ctx);
-      case 'validate/string':
-        return stdValidate.evalValidateString(args, evaluate, ctx);
-      case 'validate/number':
-        return stdValidate.evalValidateNumber(args, evaluate, ctx);
-      case 'validate/boolean':
-        return stdValidate.evalValidateBoolean(args, evaluate, ctx);
-      case 'validate/array':
-        return stdValidate.evalValidateArray(args, evaluate, ctx);
-      case 'validate/object':
-        return stdValidate.evalValidateObject(args, evaluate, ctx);
-      case 'validate/email':
-        return stdValidate.evalValidateEmail(args, evaluate, ctx);
-      case 'validate/url':
-        return stdValidate.evalValidateUrl(args, evaluate, ctx);
-      case 'validate/uuid':
-        return stdValidate.evalValidateUuid(args, evaluate, ctx);
-      case 'validate/phone':
-        return stdValidate.evalValidatePhone(args, evaluate, ctx);
-      case 'validate/creditCard':
-        return stdValidate.evalValidateCreditCard(args, evaluate, ctx);
-      case 'validate/date':
-        return stdValidate.evalValidateDate(args, evaluate, ctx);
-      case 'validate/minLength':
-        return stdValidate.evalValidateMinLength(args, evaluate, ctx);
-      case 'validate/maxLength':
-        return stdValidate.evalValidateMaxLength(args, evaluate, ctx);
-      case 'validate/length':
-        return stdValidate.evalValidateLength(args, evaluate, ctx);
-      case 'validate/min':
-        return stdValidate.evalValidateMin(args, evaluate, ctx);
-      case 'validate/max':
-        return stdValidate.evalValidateMax(args, evaluate, ctx);
-      case 'validate/range':
-        return stdValidate.evalValidateRange(args, evaluate, ctx);
-      case 'validate/pattern':
-        return stdValidate.evalValidatePattern(args, evaluate, ctx);
-      case 'validate/oneOf':
-        return stdValidate.evalValidateOneOf(args, evaluate, ctx);
-      case 'validate/noneOf':
-        return stdValidate.evalValidateNoneOf(args, evaluate, ctx);
-      case 'validate/equals':
-        return stdValidate.evalValidateEquals(args, evaluate, ctx);
-      case 'validate/check':
-        return stdValidate.evalValidateCheck(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: time/*
-      // ===============================
-      case 'time/now':
-        return stdTime.evalTimeNow();
-      case 'time/today':
-        return stdTime.evalTimeToday();
-      case 'time/parse':
-        return stdTime.evalTimeParse(args, evaluate, ctx);
-      case 'time/format':
-        return stdTime.evalTimeFormat(args, evaluate, ctx);
-      case 'time/year':
-        return stdTime.evalTimeYear(args, evaluate, ctx);
-      case 'time/month':
-        return stdTime.evalTimeMonth(args, evaluate, ctx);
-      case 'time/day':
-        return stdTime.evalTimeDay(args, evaluate, ctx);
-      case 'time/weekday':
-        return stdTime.evalTimeWeekday(args, evaluate, ctx);
-      case 'time/hour':
-        return stdTime.evalTimeHour(args, evaluate, ctx);
-      case 'time/minute':
-        return stdTime.evalTimeMinute(args, evaluate, ctx);
-      case 'time/second':
-        return stdTime.evalTimeSecond(args, evaluate, ctx);
-      case 'time/add':
-        return stdTime.evalTimeAdd(args, evaluate, ctx);
-      case 'time/subtract':
-        return stdTime.evalTimeSubtract(args, evaluate, ctx);
-      case 'time/diff':
-        return stdTime.evalTimeDiff(args, evaluate, ctx);
-      case 'time/startOf':
-        return stdTime.evalTimeStartOf(args, evaluate, ctx);
-      case 'time/endOf':
-        return stdTime.evalTimeEndOf(args, evaluate, ctx);
-      case 'time/isBefore':
-        return stdTime.evalTimeIsBefore(args, evaluate, ctx);
-      case 'time/isAfter':
-        return stdTime.evalTimeIsAfter(args, evaluate, ctx);
-      case 'time/isBetween':
-        return stdTime.evalTimeIsBetween(args, evaluate, ctx);
-      case 'time/isSame':
-        return stdTime.evalTimeIsSame(args, evaluate, ctx);
-      case 'time/isPast':
-        return stdTime.evalTimeIsPast(args, evaluate, ctx);
-      case 'time/isFuture':
-        return stdTime.evalTimeIsFuture(args, evaluate, ctx);
-      case 'time/isToday':
-        return stdTime.evalTimeIsToday(args, evaluate, ctx);
-      case 'time/relative':
-        return stdTime.evalTimeRelative(args, evaluate, ctx);
-      case 'time/duration':
-        return stdTime.evalTimeDuration(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: format/*
-      // ===============================
-      case 'format/number':
-        return stdFormat.evalFormatNumber(args, evaluate, ctx);
-      case 'format/currency':
-        return stdFormat.evalFormatCurrency(args, evaluate, ctx);
-      case 'format/percent':
-        return stdFormat.evalFormatPercent(args, evaluate, ctx);
-      case 'format/bytes':
-        return stdFormat.evalFormatBytes(args, evaluate, ctx);
-      case 'format/ordinal':
-        return stdFormat.evalFormatOrdinal(args, evaluate, ctx);
-      case 'format/plural':
-        return stdFormat.evalFormatPlural(args, evaluate, ctx);
-      case 'format/list':
-        return stdFormat.evalFormatList(args, evaluate, ctx);
-      case 'format/phone':
-        return stdFormat.evalFormatPhone(args, evaluate, ctx);
-      case 'format/creditCard':
-        return stdFormat.evalFormatCreditCard(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: async/*
-      // ===============================
-      case 'async/delay':
-        return stdAsync.evalAsyncDelay(args, evaluate, ctx);
-      case 'async/interval':
-        return stdAsync.evalAsyncInterval(args, evaluate, ctx);
-      case 'async/timeout':
-        return stdAsync.evalAsyncTimeout(args, evaluate, ctx);
-      case 'async/debounce':
-        stdAsync.evalAsyncDebounce(args, evaluate, ctx);
-        return undefined;
-      case 'async/throttle':
-        stdAsync.evalAsyncThrottle(args, evaluate, ctx);
-        return undefined;
-      case 'async/retry':
-        return stdAsync.evalAsyncRetry(args, evaluate, ctx);
-      case 'async/race':
-        return stdAsync.evalAsyncRace(args, evaluate, ctx);
-      case 'async/all':
-        return stdAsync.evalAsyncAll(args, evaluate, ctx);
-      case 'async/sequence':
-        return stdAsync.evalAsyncSequence(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: prob/*
-      // ===============================
-      case 'prob/seed':
-        stdProb.evalProbSeed(args, evaluate, ctx);
-        return undefined;
-      case 'prob/flip':
-        return stdProb.evalProbFlip(args, evaluate, ctx);
-      case 'prob/gaussian':
-        return stdProb.evalProbGaussian(args, evaluate, ctx);
-      case 'prob/uniform':
-        return stdProb.evalProbUniform(args, evaluate, ctx);
-      case 'prob/beta':
-        return stdProb.evalProbBeta(args, evaluate, ctx);
-      case 'prob/categorical':
-        return stdProb.evalProbCategorical(args, evaluate, ctx);
-      case 'prob/poisson':
-        return stdProb.evalProbPoisson(args, evaluate, ctx);
-      case 'prob/condition':
-        stdProb.evalProbCondition(args, evaluate, ctx);
-        return undefined;
-      case 'prob/sample':
-        return stdProb.evalProbSample(args, evaluate, ctx);
-      case 'prob/posterior':
-        return stdProb.evalProbPosterior(args, evaluate, ctx);
-      case 'prob/infer':
-        return stdProb.evalProbInfer(args, evaluate, ctx);
-      case 'prob/expected-value':
-        return stdProb.evalProbExpectedValue(args, evaluate, ctx);
-      case 'prob/variance':
-        return stdProb.evalProbVariance(args, evaluate, ctx);
-      case 'prob/histogram':
-        return stdProb.evalProbHistogram(args, evaluate, ctx);
-      case 'prob/percentile':
-        return stdProb.evalProbPercentile(args, evaluate, ctx);
-      case 'prob/credible-interval':
-        return stdProb.evalProbCredibleInterval(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: os/*
-      // ===============================
-      case 'os/watch-files': stdOs.evalOsWatchFiles(args, evaluate, ctx); return undefined;
-      case 'os/watch-process': stdOs.evalOsWatchProcess(args, evaluate, ctx); return undefined;
-      case 'os/watch-port': stdOs.evalOsWatchPort(args, evaluate, ctx); return undefined;
-      case 'os/watch-http': stdOs.evalOsWatchHttp(args, evaluate, ctx); return undefined;
-      case 'os/watch-cron': stdOs.evalOsWatchCron(args, evaluate, ctx); return undefined;
-      case 'os/watch-signal': stdOs.evalOsWatchSignal(args, evaluate, ctx); return undefined;
-      case 'os/watch-env': stdOs.evalOsWatchEnv(args, evaluate, ctx); return undefined;
-      case 'os/debounce': stdOs.evalOsDebounce(args, evaluate, ctx); return undefined;
-
-      // ===============================
-      // Standard Library: llm/*
-      // ===============================
-      case 'llm/generate':           return stdLlm.evalLlmGenerate(args, evaluate, ctx);
-      case 'llm/call-tools':         return stdLlm.evalLlmCallTools(args, evaluate, ctx);
-      case 'llm/embed':              return stdLlm.evalLlmEmbed(args, evaluate, ctx);
-      case 'llm/token-count':        return stdLlm.evalLlmTokenCount(args, evaluate, ctx);
-      case 'llm/switch':             return stdLlm.evalLlmSwitch(args, evaluate, ctx);
-      case 'llm/compact':            return stdLlm.evalLlmCompact(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: workspace/*
-      // ===============================
-      case 'workspace/read-orbital':   return stdWorkspace.evalWorkspaceReadOrbital(args, evaluate, ctx);
-      case 'workspace/write-orbital':  return stdWorkspace.evalWorkspaceWriteOrbital(args, evaluate, ctx);
-      case 'workspace/read-file':      return stdWorkspace.evalWorkspaceReadFile(args, evaluate, ctx);
-      case 'workspace/write-file':     return stdWorkspace.evalWorkspaceWriteFile(args, evaluate, ctx);
-      case 'workspace/exists':         return stdWorkspace.evalWorkspaceExists(args, evaluate, ctx);
-      case 'workspace/list-orbitals':  return stdWorkspace.evalWorkspaceListOrbitals(args, evaluate, ctx);
-      case 'workspace/read-schema':    return stdWorkspace.evalWorkspaceReadSchema(args, evaluate, ctx);
-      case 'workspace/write-schema':   return stdWorkspace.evalWorkspaceWriteSchema(args, evaluate, ctx);
-      case 'workspace/read-plan':      return stdWorkspace.evalWorkspaceReadPlan(args, evaluate, ctx);
-      case 'workspace/write-plan':     return stdWorkspace.evalWorkspaceWritePlan(args, evaluate, ctx);
-      case 'workspace/archive-orbital': return stdWorkspace.evalWorkspaceArchiveOrbital(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: session/*
-      // ===============================
-      case 'session/read-spec':        return stdSession.evalSessionReadSpec(args, evaluate, ctx);
-      case 'session/write-spec':       return stdSession.evalSessionWriteSpec(args, evaluate, ctx);
-      case 'session/read-memory':      return stdSession.evalSessionReadMemory(args, evaluate, ctx);
-      case 'session/write-memory':     return stdSession.evalSessionWriteMemory(args, evaluate, ctx);
-      case 'session/read-history':     return stdSession.evalSessionReadHistory(args, evaluate, ctx);
-      case 'session/append-history':   return stdSession.evalSessionAppendHistory(args, evaluate, ctx);
-      case 'session/read-errors':      return stdSession.evalSessionReadErrors(args, evaluate, ctx);
-      case 'session/write-errors':     return stdSession.evalSessionWriteErrors(args, evaluate, ctx);
-      case 'session/read-analysis':    return stdSession.evalSessionReadAnalysis(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: memory/*
-      // ===============================
-      case 'memory/recall':          return stdMemory.evalMemoryRecall(args, evaluate, ctx);
-      case 'memory/store':           return stdMemory.evalMemoryStore(args, evaluate, ctx);
-      case 'memory/list':            return stdMemory.evalMemoryList(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: trace/*
-      // ===============================
-      case 'trace/emit':             return stdTrace.evalTraceEmit(args, evaluate, ctx);
-      case 'trace/log':              return stdTrace.evalTraceLog(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: integration/*
-      // ===============================
-      case 'integration/http':                return stdIntegration.evalIntegrationHttp(args, evaluate, ctx);
-      case 'integration/github-get-repo':     return stdIntegration.evalIntegrationGithubGetRepo(args, evaluate, ctx);
-      case 'integration/github-create-issue': return stdIntegration.evalIntegrationGithubCreateIssue(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: contract/*
-      // ===============================
-      case 'contract/validate-input':    return stdContract.evalContractValidateInput(args, evaluate, ctx);
-      case 'contract/validate-output':   return stdContract.evalContractValidateOutput(args, evaluate, ctx);
-      case 'contract/clamp-output':      return stdContract.evalContractClampOutput(args, evaluate, ctx);
-      case 'contract/violations':        return stdContract.evalContractViolations(args, evaluate, ctx);
-      case 'contract/entity-to-tensor':  return stdContract.evalContractEntityToTensor(args, evaluate, ctx);
-      case 'contract/tensor-to-payload': return stdContract.evalContractTensorToPayload(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: graph/*
-      // ===============================
-      case 'graph/from-entities':    return stdGraph.evalGraphFromEntities(args, evaluate, ctx);
-      case 'graph/from-adjacency':   return stdGraph.evalGraphFromAdjacency(args, evaluate, ctx);
-      case 'graph/from-edge-list':   return stdGraph.evalGraphFromEdgeList(args, evaluate, ctx);
-      case 'graph/add-self-loops':   return stdGraph.evalGraphAddSelfLoops(args, evaluate, ctx);
-      case 'graph/to-undirected':    return stdGraph.evalGraphToUndirected(args, evaluate, ctx);
-      case 'graph/subgraph':         return stdGraph.evalGraphSubgraph(args, evaluate, ctx);
-      case 'graph/k-hop':            return stdGraph.evalGraphKHop(args, evaluate, ctx);
-      case 'graph/node-features':    return stdGraph.evalGraphNodeFeatures(args, evaluate, ctx);
-      case 'graph/edge-index':       return stdGraph.evalGraphEdgeIndex(args, evaluate, ctx);
-      case 'graph/edge-features':    return stdGraph.evalGraphEdgeFeatures(args, evaluate, ctx);
-      case 'graph/num-nodes':        return stdGraph.evalGraphNumNodes(args, evaluate, ctx);
-      case 'graph/num-edges':        return stdGraph.evalGraphNumEdges(args, evaluate, ctx);
-      case 'graph/degree':           return stdGraph.evalGraphDegree(args, evaluate, ctx);
-      case 'graph/batch':            return stdGraph.evalGraphBatch(args, evaluate, ctx);
-
-      // ===============================
-      // Standard Library: data/*
-      // ===============================
-      case 'data/dataset':    return stdData.evalDataDataset(args, evaluate, ctx);
-      case 'data/dataloader': return stdData.evalDataDataloader(args, evaluate, ctx);
-      case 'data/split':      return stdData.evalDataSplit(args, evaluate, ctx);
-      case 'data/normalize':  return stdData.evalDataNormalize(args, evaluate, ctx);
-      case 'data/augment':    return stdData.evalDataAugment(args, evaluate, ctx);
-      case 'data/tokenize':   return stdData.evalDataTokenize(args, evaluate, ctx);
-      case 'data/pad':        return stdData.evalDataPad(args, evaluate, ctx);
-
-      default:
-        return UNKNOWN_OPERATOR;
-    }
+    const impl = OPERATOR_TABLE[op];
+    if (impl === undefined) return UNKNOWN_OPERATOR;
+    return impl(args, this.boundInterpret, ctx);
   }
 }
 
@@ -1089,7 +742,7 @@ export class SExpressionEvaluator {
 export const evaluator = new SExpressionEvaluator();
 
 // Export convenience functions
-export function evaluate(expr: SExpr, ctx: EvaluationContext): unknown {
+export function evaluate(expr: SExpr, ctx: EvaluationContext): RuntimeValue {
   return evaluator.evaluate(expr, ctx);
 }
 
