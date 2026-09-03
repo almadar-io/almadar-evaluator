@@ -380,9 +380,20 @@ describe('SExpressionEvaluator', () => {
       expect(evaluate(['empty', []], ctx)).toBe(true);
     });
 
-    it('evaluates concat', () => {
-      const result = evaluate(['concat', [1, 2], [3, 4]], ctx);
+    // R-EVAL-CONCAT-PATH-DIVERGENCE conformance pins (JS side; mirrored in
+    // orbital-rust/crates/orbital-core/src/evaluator/mod.rs).
+    it('concat_conformance_str_concat_joins_mixed_args', () => {
+      const result = evaluate(['str/concat', 'x=', '1', ' y=', '2'], ctx);
+      expect(result).toBe('x=1 y=2');
+    });
+
+    it('concat_conformance_array_concat_concatenates_arrays', () => {
+      const result = evaluate(['array/concat', [1, 2], [3, 4]], ctx);
       expect(result).toEqual([1, 2, 3, 4]);
+    });
+
+    it('concat_conformance_bare_concat_errors', () => {
+      expect(() => evaluate(['concat', [1, 2], [3, 4]], ctx)).toThrow(/concat/i);
     });
 
     it('evaluates map', () => {

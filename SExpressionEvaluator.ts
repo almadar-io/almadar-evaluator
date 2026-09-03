@@ -51,7 +51,6 @@ import {
   evalFirst,
   evalLast,
   evalNth,
-  evalConcat,
   evalIncludes,
   evalEmpty,
   evalList,
@@ -122,6 +121,19 @@ type OpImpl = (args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext) => Ru
 const UNKNOWN_OPERATOR = Symbol('unknown-operator');
 
 /**
+ * Bare "concat" is ambiguous between str/concat and array/concat
+ * (R-EVAL-CONCAT-PATH-DIVERGENCE) — it has no dispatch entry and must not
+ * silently fall through to the literal-array path other unknown heads take.
+ */
+function assertNotAmbiguousConcat(op: string): void {
+  if (op === 'concat') {
+    throw new Error(
+      "Ambiguous operator 'concat': use 'str/concat' (string) or 'array/concat' (array)",
+    );
+  }
+}
+
+/**
  * S-Expression Evaluator class.
  *
  * Provides runtime interpretation of S-expressions for guards, effects, and computed values.
@@ -169,7 +181,6 @@ const OPERATOR_TABLE: Record<string, OpImpl> = {
   'first': evalFirst,
   'last': evalLast,
   'nth': evalNth,
-  'concat': evalConcat,
   'includes': evalIncludes,
   'empty': evalEmpty,
   'list': evalList,
@@ -627,6 +638,7 @@ export class SExpressionEvaluator {
     } else {
       const op = getOperator(expr)!;
       const args = getArgs(expr);
+      assertNotAmbiguousConcat(op);
       // Arity before the table lookup — same order as dispatchOperator, so a
       // registry-registered but undispatched head throws identically on both
       // paths (assertOperatorArity no-ops on unregistered ops).
@@ -731,6 +743,7 @@ export class SExpressionEvaluator {
     // operator applied outside its canonical arity bounds throws instead of
     // silently truncating/wrapping (R-EVALUATOR-NO-ARITY-CHECK). Unregistered
     // heads fall through to the data-array handling unchanged.
+    assertNotAmbiguousConcat(op);
     assertOperatorArity(op, args.length);
     const impl = OPERATOR_TABLE[op];
     if (impl === undefined) return UNKNOWN_OPERATOR;

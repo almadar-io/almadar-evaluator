@@ -106,7 +106,10 @@ export function evalNth(args: SExpr[], evaluate: Evaluator, ctx: EvaluationConte
 }
 
 /**
- * Evaluate concat: ["concat", collection1, collection2, ...]
+ * Array-concat semantics for a collection of args. Not wired to any bare
+ * "concat" S-expr head (removed as an ambiguous alias — use 'array/concat'
+ * or std/array.ts's evalArrayConcat, which is what "array/concat" dispatches
+ * to); kept as a plain exported utility.
  */
 export function evalConcat(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue[] {
   const result: RuntimeValue[] = [];
