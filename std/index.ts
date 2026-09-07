@@ -132,7 +132,6 @@ export {
 export {
   evalArrayLen,
   evalArrayRange,
-  evalArrayEmpty,
   evalArrayFirst,
   evalArrayLast,
   evalArrayNth,
@@ -188,7 +187,6 @@ export {
   evalObjectMapValues,
   evalObjectMapKeys,
   evalObjectFilter,
-  evalObjectEmpty,
   evalObjectEquals,
   evalObjectClone,
   evalObjectDeepClone,

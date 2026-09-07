@@ -140,6 +140,24 @@ describe('resolveBinding', () => {
     });
   });
 
+  describe('@callsitePayload bindings', () => {
+    it('resolves undefined when no callsite payload is set', () => {
+      expect(resolveBinding('@callsitePayload.error', ctx)).toBeUndefined();
+    });
+
+    it('resolves whole-value captures against the composing payload', () => {
+      ctx.callsitePayload = { error: 'Boom' };
+      expect(resolveBinding('@callsitePayload.error', ctx)).toBe('Boom');
+    });
+
+    it('resolves nested captures used inside S-expressions', () => {
+      ctx.callsitePayload = { data: { status: 'resolved', csatScore: null } };
+      expect(resolveBinding('@callsitePayload.data.status', ctx)).toBe('resolved');
+      expect(resolveBinding('@callsitePayload.data.csatScore', ctx)).toBeNull();
+      expect(resolveBinding('@callsitePayload.data.missing', ctx)).toBeUndefined();
+    });
+  });
+
   describe('@state binding', () => {
     it('resolves state directly (no path)', () => {
       expect(resolveBinding('@state', ctx)).toBe('active');

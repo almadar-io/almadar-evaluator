@@ -166,18 +166,6 @@ export function evalArrayRange(
 }
 
 /**
- * array/empty? - Check if array is empty
- */
-export function evalArrayEmpty(
-  args: SExpr[],
-  evaluate: EvalFn,
-  ctx: EvaluationContext
-): boolean {
-  const arr = evaluate(args[0], ctx) as RuntimeValue[];
-  return !arr || arr.length === 0;
-}
-
-/**
  * array/first - Get first element
  */
 export function evalArrayFirst(

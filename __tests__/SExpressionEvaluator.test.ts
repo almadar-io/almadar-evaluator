@@ -296,6 +296,35 @@ describe('SExpressionEvaluator', () => {
   });
 
   // ============================================================================
+  // @callsitePayload — embedded-child captures (JSX-hoisted inline traits)
+  // ============================================================================
+
+  describe('@callsitePayload captures', () => {
+    it('resolves a nested capture inside an if/and/= expression (std-helpdesk disabled shape)', () => {
+      const disabledExpr = [
+        'if',
+        ['and', ['=', '@callsitePayload.data.status', 'resolved'], true],
+        false,
+        true,
+      ];
+      ctx.callsitePayload = { data: { status: 'resolved', csatScore: null } };
+      expect(evaluate(disabledExpr, ctx)).toBe(false);
+
+      ctx.callsitePayload = { data: { status: 'open' } };
+      expect(evaluate(disabledExpr, ctx)).toBe(true);
+    });
+
+    it('resolves a whole-value capture (std-helpdesk content shape)', () => {
+      ctx.callsitePayload = { error: 'Boom' };
+      expect(evaluate('@callsitePayload.error', ctx)).toBe('Boom');
+    });
+
+    it('resolves undefined when no callsite payload was bound', () => {
+      expect(evaluate('@callsitePayload.error', ctx)).toBeUndefined();
+    });
+  });
+
+  // ============================================================================
   // Control Operators
   // ============================================================================
 

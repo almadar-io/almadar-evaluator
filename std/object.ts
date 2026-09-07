@@ -349,18 +349,6 @@ export function evalObjectFilter(
 }
 
 /**
- * object/empty? - Check if object has no keys
- */
-export function evalObjectEmpty(
-  args: SExpr[],
-  evaluate: EvalFn,
-  ctx: EvaluationContext
-): boolean {
-  const obj = evaluate(args[0], ctx) as Record<string, RuntimeValue>;
-  return !obj || Object.keys(obj).length === 0;
-}
-
-/**
  * object/equals - Deep equality check
  */
 export function evalObjectEquals(

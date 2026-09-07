@@ -28,6 +28,19 @@ export interface EvaluationContext {
   /** Payload data for @payload bindings */
   payload: EventPayload;
 
+  /**
+   * The composing effect's triggering payload, for a trait embedded via
+   * `@trait.X` inline into a parent's render-ui. The lolo lowerer hoists a
+   * JSX render site's `?field` reads into the embedded child's config as
+   * `@callsitePayload.<field>` — mirrors the compiled path's
+   * `CALLSITE_PAYLOAD_PREFIX` (`orbital-core/src/schema/types.rs`) and
+   * `@almadar/core`'s `CORE_BINDINGS` root `callsitePayload`. Set by
+   * `OrbitalServerRuntime.executeEffects` / the client's
+   * `useTraitStateMachine` when re-running an embedded child's lifecycle
+   * transition under its embedder's payload.
+   */
+  callsitePayload?: EventPayload;
+
   /** Current state for @state binding */
   state: string;
 
@@ -283,6 +296,12 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): Runtime
         break;
       case 'payload':
         value = ctx.payload;
+        break;
+      case 'callsitePayload':
+        // The composing transition's triggering payload, for a JSX-hoisted
+        // inline child trait (`@callsitePayload.<field>`). See the
+        // `EvaluationContext.callsitePayload` doc above.
+        value = ctx.callsitePayload;
         break;
       case 'state':
         return ctx.state; // @state has no path

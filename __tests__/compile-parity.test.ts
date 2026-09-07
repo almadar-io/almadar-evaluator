@@ -138,7 +138,7 @@ describe('compile parity: unit corpus', () => {
   }
 
   it('arity violation throws identically', () => {
-    const bad = ['object/get'] as unknown as SExpr;
+    const bad: SExpr = ['object/get'];
     expectParity(bad, 'arity throw parity');
   });
 

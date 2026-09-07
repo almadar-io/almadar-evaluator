@@ -231,11 +231,6 @@ describe('StdLibraryEvaluator', () => {
       expect(evaluate(['array/len', [1, 2, 3]], ctx)).toBe(3);
     });
 
-    it('array/empty? checks if array is empty', () => {
-      expect(evaluate(['array/empty?', []], ctx)).toBe(true);
-      expect(evaluate(['array/empty?', [1]], ctx)).toBe(false);
-    });
-
     it('array/first returns first element', () => {
       expect(evaluate(['array/first', [1, 2, 3]], ctx)).toBe(1);
     });
@@ -473,11 +468,6 @@ describe('StdLibraryEvaluator', () => {
         a: 1,
         c: 3,
       });
-    });
-
-    it('object/empty? checks if empty', () => {
-      expect(evaluate(['object/empty?', {}], ctx)).toBe(true);
-      expect(evaluate(['object/empty?', { a: 1 }], ctx)).toBe(false);
     });
 
     it('object/equals checks deep equality', () => {
