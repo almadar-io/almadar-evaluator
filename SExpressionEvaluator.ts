@@ -78,6 +78,7 @@ import * as stdMath from './std/math.js';
 import * as stdStr from './std/str.js';
 import * as stdArray from './std/array.js';
 import * as stdObject from './std/object.js';
+import * as stdJson from './std/json.js';
 import * as stdValidate from './std/validate.js';
 import * as stdTime from './std/time.js';
 import * as stdFormat from './std/format.js';
@@ -357,6 +358,8 @@ const OPERATOR_TABLE: Record<string, OpImpl> = {
   'object/clone': stdObject.evalObjectClone,
   'object/deepClone': stdObject.evalObjectDeepClone,
   'path': stdObject.evalPath,
+  'json/parse': stdJson.evalJsonParse,
+  'json/stringify': stdJson.evalJsonStringify,
   'validate/required': stdValidate.evalValidateRequired,
   'validate/string': stdValidate.evalValidateString,
   'validate/number': stdValidate.evalValidateNumber,

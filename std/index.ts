@@ -193,6 +193,12 @@ export {
   evalPath,
 } from './object.js';
 
+// JSON operators
+export {
+  evalJsonParse,
+  evalJsonStringify,
+} from './json.js';
+
 // Validate operators
 export {
   evalValidateRequired,
