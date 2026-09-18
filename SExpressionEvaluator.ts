@@ -183,6 +183,14 @@ const OPERATOR_TABLE: Record<string, OpImpl> = {
   'last': evalLast,
   'nth': evalNth,
   'includes': evalIncludes,
+  // Legacy bare alias for 'str/join' — orbital-core's evaluator already
+  // dispatches both spellings to the same op (`"join" | "str/join" =>
+  // K::JoinOp`, evaluator/operators/mod.rs:121); this interpreter had no
+  // entry at all for the bare form, so `(join arr sep)` fell through to the
+  // generic "unknown operator, treat as literal data" path instead of
+  // erroring OR joining — confirmed live via project-friday's Global Search
+  // (L-26, `Almadar_LOLO_Gaps.md`).
+  'join': stdStr.evalStrJoin,
   'empty': evalEmpty,
   'list': evalList,
   'set': (args, evaluate, ctx) => { evalSet(args, evaluate, ctx); return undefined; },

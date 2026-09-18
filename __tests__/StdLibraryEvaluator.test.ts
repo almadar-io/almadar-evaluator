@@ -143,6 +143,17 @@ describe('StdLibraryEvaluator', () => {
       expect(evaluate(['str/join', '@entity.arr', ', '], ctx)).toBe('a, b, c');
     });
 
+    it('bare "join" is a legacy alias for str/join (L-26, Almadar_LOLO_Gaps.md)', () => {
+      // orbital-core's evaluator dispatches both spellings to the same op
+      // ("join" | "str/join" => K::JoinOp) — this interpreter had no entry
+      // for the bare form at all, so `(join arr sep)` silently fell through
+      // to the generic "unknown operator" literal-array fallback instead of
+      // joining, confirmed live via project-friday's Global Search.
+      ctx = createMinimalContext({ arr: ['a', 'b', 'c'] }, {});
+      expect(evaluate(['join', '@entity.arr', ', '], ctx)).toBe('a, b, c');
+      expect(evaluate(['join', [], ', '], ctx)).toBe('');
+    });
+
     it('str/slice extracts substring', () => {
       expect(evaluate(['str/slice', 'hello', 1, 4], ctx)).toBe('ell');
       expect(evaluate(['str/slice', 'hello', 1], ctx)).toBe('ello');
