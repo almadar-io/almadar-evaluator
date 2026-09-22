@@ -219,6 +219,8 @@ const OPERATOR_TABLE: Record<string, OpImpl> = {
   'math/round': stdMath.evalMathRound,
   'math/pow': stdMath.evalMathPow,
   'math/sqrt': stdMath.evalMathSqrt,
+  'math/log10': stdMath.evalMathLog10,
+  'math/ln': stdMath.evalMathLn,
   'math/mod': stdMath.evalMathMod,
   'math/sign': stdMath.evalMathSign,
   'math/lerp': stdMath.evalMathLerp,

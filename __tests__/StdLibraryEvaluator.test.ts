@@ -71,6 +71,16 @@ describe('StdLibraryEvaluator', () => {
       expect(evaluate(['math/sqrt', 9], ctx)).toBe(3);
     });
 
+    it('math/log10 calculates base-10 logarithm', () => {
+      expect(evaluate(['math/log10', 100], ctx)).toBe(2);
+      expect(evaluate(['math/log10', 1000], ctx)).toBe(3);
+    });
+
+    it('math/ln calculates natural logarithm', () => {
+      expect(evaluate(['math/ln', 1], ctx)).toBe(0);
+      expect(evaluate(['math/ln', Math.E], ctx)).toBeCloseTo(1, 10);
+    });
+
     it('math/mod calculates modulo', () => {
       expect(evaluate(['math/mod', 7, 3], ctx)).toBe(1);
       expect(evaluate(['math/mod', 10, 5], ctx)).toBe(0);

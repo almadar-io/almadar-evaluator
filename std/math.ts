@@ -128,6 +128,30 @@ export function evalMathSqrt(
 }
 
 /**
+ * math/log10 - Base-10 logarithm
+ */
+export function evalMathLog10(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  const n = evaluate(args[0], ctx) as number;
+  return Math.log10(n);
+}
+
+/**
+ * math/ln - Natural logarithm (base e)
+ */
+export function evalMathLn(
+  args: SExpr[],
+  evaluate: EvalFn,
+  ctx: EvaluationContext
+): number {
+  const n = evaluate(args[0], ctx) as number;
+  return Math.log(n);
+}
+
+/**
  * math/mod - Modulo (remainder)
  */
 export function evalMathMod(

@@ -17,6 +17,8 @@ export {
   evalMathRound,
   evalMathPow,
   evalMathSqrt,
+  evalMathLog10,
+  evalMathLn,
   evalMathMod,
   evalMathSign,
   evalMathLerp,
