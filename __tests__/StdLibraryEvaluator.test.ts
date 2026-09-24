@@ -81,6 +81,14 @@ describe('StdLibraryEvaluator', () => {
       expect(evaluate(['math/ln', Math.E], ctx)).toBeCloseTo(1, 10);
     });
 
+    it('math/log10 and math/ln agree with the Rust kernel at 1, 0 and below 0', () => {
+      for (const op of ['math/log10', 'math/ln']) {
+        expect(evaluate([op, 1], ctx)).toBe(0);
+        expect(evaluate([op, 0], ctx)).toBe(-Infinity);
+        expect(evaluate([op, -1], ctx)).toBeNaN();
+      }
+    });
+
     it('math/mod calculates modulo', () => {
       expect(evaluate(['math/mod', 7, 3], ctx)).toBe(1);
       expect(evaluate(['math/mod', 10, 5], ctx)).toBe(0);
@@ -439,6 +447,16 @@ describe('StdLibraryEvaluator', () => {
       ctx = createMinimalContext({ user: { profile: { name: 'John' } } }, {});
       expect(evaluate(['object/get', '@entity.user', 'profile.name'], ctx)).toBe('John');
       expect(evaluate(['object/get', '@entity.user', 'profile.age', 25], ctx)).toBe(25);
+    });
+
+    it('object/get default: taken when absent, evaluated, never over a present falsy value (twin of orbital-core tests/object_get_default.rs)', () => {
+      ctx = createMinimalContext({}, { fallback: 'from-payload' });
+      expect(evaluate(['object/get', { a: 1 }, 'b', 'dflt'], ctx)).toBe('dflt');
+      expect(evaluate(['object/get', {}, 'kind', '@payload.fallback'], ctx)).toBe('from-payload');
+      expect(evaluate(['object/get', { a: {} }, 'a.b.c', 'none'], ctx)).toBe('none');
+      expect(evaluate(['object/get', { k: '' }, 'k', 'dflt'], ctx)).toBe('');
+      expect(evaluate(['object/get', { k: false }, 'k', true], ctx)).toBe(false);
+      expect(evaluate(['object/get', { a: 1 }, 'b'], ctx) ?? null).toBeNull();
     });
 
     it('object/set sets nested value', () => {

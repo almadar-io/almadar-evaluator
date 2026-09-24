@@ -129,7 +129,7 @@ export function evalAsyncThrottle(
   const event = evaluate(args[0], ctx) as string;
   const ms = evaluate(args[1], ctx) as number;
 
-  const now = Date.now();
+  const now = ctx.now;
   const lastTimestamp = throttleTimestamps.get(event) ?? 0;
 
   if (now - lastTimestamp >= ms) {

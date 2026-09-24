@@ -83,6 +83,17 @@ export interface EvaluationContext {
    */
   currentTheme?: string;
 
+  /** `@event`: the delivery being processed (`deliveryRecordValue`, Runtime Spec Clause 5.5). */
+  event?: EventPayload;
+  /** `@prevEvents`: deliveries this trait already received this dispatch, in order. */
+  prevEvents?: EventPayload[];
+  /** `@prevStates`: states this trait left this dispatch, in order. */
+  prevStates?: string[];
+  /** `@fromState`: the transition's source state. */
+  fromState?: string;
+  /** `@toState`: the transition's target state. */
+  toState?: string;
+
   /**
    * When true, log warnings when bindings resolve to undefined. (RCG-01)
    * Helps detect typos and missing entity fields early.
@@ -326,6 +337,17 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): Runtime
         // Render-resolved schema sigil — the `data-theme` key string derived
         // from `Orbital.theme`. Bare root (no path); render-context only.
         return ctx.currentTheme;
+      case 'event':
+        value = ctx.event;
+        break;
+      case 'prevEvents':
+        return ctx.prevEvents ?? [];
+      case 'prevStates':
+        return ctx.prevStates ?? [];
+      case 'fromState':
+        return ctx.fromState;
+      case 'toState':
+        return ctx.toState;
       default:
         // Singleton entity reference (@EntityName.field)
         value = ctx.singletons.get(root);

@@ -166,15 +166,15 @@ function wholeMonthsBetween(from: number, to: number): number {
 /**
  * time/now - Current timestamp
  */
-export function evalTimeNow(): number {
-  return Date.now();
+export function evalTimeNow(ctx: EvaluationContext): number {
+  return ctx.now;
 }
 
 /**
  * time/today - Today at midnight (local time)
  */
-export function evalTimeToday(): number {
-  const now = new Date();
+export function evalTimeToday(ctx: EvaluationContext): number {
+  const now = new Date(ctx.now);
   now.setHours(0, 0, 0, 0);
   return now.getTime();
 }
@@ -494,7 +494,7 @@ export function evalTimeIsPast(
   ctx: EvaluationContext
 ): boolean {
   const timestamp = evaluate(args[0], ctx) as number;
-  return timestamp < Date.now();
+  return timestamp < ctx.now;
 }
 
 /**
@@ -506,7 +506,7 @@ export function evalTimeIsFuture(
   ctx: EvaluationContext
 ): boolean {
   const timestamp = evaluate(args[0], ctx) as number;
-  return timestamp > Date.now();
+  return timestamp > ctx.now;
 }
 
 /**
@@ -519,7 +519,7 @@ export function evalTimeIsToday(
 ): boolean {
   const timestamp = evaluate(args[0], ctx) as number;
   const date = new Date(timestamp);
-  const today = new Date();
+  const today = new Date(ctx.now);
 
   return (
     date.getFullYear() === today.getFullYear() &&
@@ -537,7 +537,7 @@ export function evalTimeRelative(
   ctx: EvaluationContext
 ): string {
   const timestamp = evaluate(args[0], ctx) as number;
-  const now = Date.now();
+  const now = ctx.now;
   const diff = timestamp - now;
   const absDiff = Math.abs(diff);
   const isPast = diff < 0;
