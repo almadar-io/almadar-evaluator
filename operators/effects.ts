@@ -326,7 +326,7 @@ export function evalDecrement(args: SExpr[], evaluate: Evaluator, ctx: Evaluatio
   ctx.mutateEntity({ [fieldPath]: newValue });
 }
 
-// ── Resource operators (ref/deref/swap!/watch/atomic) ──
+// ── Resource operators (ref/deref/swap/watch/atomic) ──
 
 /**
  * Evaluate ref: ["ref", "EntityType"] or ["ref", "EntityType", { filter, include }]
@@ -363,7 +363,7 @@ export function evalDeref(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCon
 }
 
 /**
- * Evaluate swap!: ["swap!", "EntityType", idExpr, transformExpr]
+ * Evaluate swap: ["swap", "EntityType", idExpr, transformExpr]
  * Atomic read-modify-write with CAS retry.
  */
 export function evalSwap(args: SExpr[], evaluate: Evaluator, ctx: EvaluationContext): RuntimeValue {

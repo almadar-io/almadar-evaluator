@@ -159,7 +159,7 @@ export interface EvaluationContext {
   registerOsTrigger?: (type: string, config: Record<string, RuntimeValue>) => void;
 
   // ============================================================================
-  // Resource Operators (ref/deref/swap!/watch/atomic)
+  // Resource Operators (ref/deref/swap/watch/atomic)
   // ============================================================================
 
   /** Effect handlers for resource operators (grouped to avoid top-level pollution) */

@@ -207,7 +207,7 @@ const OPERATOR_TABLE: Record<string, OpImpl> = {
   'render-ui': (args, evaluate, ctx) => { evalRenderUI(args, evaluate, ctx); return undefined; },
   'ref': evalRef,
   'deref': evalDeref,
-  'swap!': evalSwap,
+  'swap': evalSwap,
   'watch': (args, evaluate, ctx) => { evalWatch(args, evaluate, ctx); return undefined; },
   'atomic': evalAtomic,
   'math/abs': stdMath.evalMathAbs,
