@@ -45,6 +45,7 @@ export {
   evaluator,
   evaluate,
   evaluateGuard,
+  evaluateTraced,
   executeEffect,
   executeEffects,
 } from './SExpressionEvaluator.js';

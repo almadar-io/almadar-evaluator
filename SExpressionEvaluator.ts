@@ -11,7 +11,7 @@ import type { SExpr } from './types/expression.js';
 import { assertOperatorArity } from '@almadar/std/registry';
 import { isSExpr, isBinding, getOperator, getArgs } from './types/expression.js';
 import type { EvaluationContext, Evaluator } from './context.js';
-import type { RuntimeValue } from '@almadar/core';
+import type { EvalTrace, RuntimeValue, SExprPath } from '@almadar/core';
 import { resolveBinding } from './context.js';
 
 // Import operators
@@ -744,12 +744,96 @@ export class SExpressionEvaluator {
   }
 
   /**
+   * Evaluate `expr` recording every node's entry, value and exit by structural
+   * path, lambda re-entries (`iter`) and arguments the operator never ran
+   * (`skip`). Runs the same operator implementations as `evaluate`, never the
+   * compiled closures. Never throws: a failure is returned with the trace so far.
+   */
+  evaluateTraced(expr: SExpr, ctx: EvaluationContext): { value?: RuntimeValue; trace: EvalTrace; error?: string } {
+    const trace: EvalTrace = [];
+    const paths = new Map<object, SExprPath>();
+    const indexPaths = (node: SExpr, path: SExprPath): void => {
+      if (typeof node !== 'object' || node === null) return;
+      paths.set(node, path);
+      if (Array.isArray(node)) node.forEach((child, i) => indexPaths(child, [...path, i]));
+      else for (const [k, child] of Object.entries(node)) indexPaths(child, [...path, k]);
+    };
+    indexPaths(expr, []);
+
+    const entered = new Set<string>();
+    const keyOf = (path: SExprPath): string => path.join('\u0000');
+    const ranUnder = (path: SExprPath): boolean => {
+      const k = keyOf(path);
+      for (const e of entered) if (e === k || e.startsWith(k + '\u0000')) return true;
+      return false;
+    };
+
+    const visit = (node: SExpr, path: SExprPath, c: EvaluationContext): RuntimeValue => {
+      const k = keyOf(path);
+      if (entered.has(k)) trace.push({ kind: 'iter', path });
+      entered.add(k);
+      trace.push({ kind: 'enter', path });
+      try {
+        const value = step(node, path, c);
+        trace.push({ kind: 'exit', path, value });
+        return value;
+      } catch (err) {
+        trace.push({ kind: 'exit', path, error: err instanceof Error ? err.message : String(err) });
+        throw err;
+      }
+    };
+
+    const step = (node: SExpr, path: SExprPath, c: EvaluationContext): RuntimeValue => {
+      if (!isSExpr(node)) {
+        if (isBinding(node)) return resolveBinding(node, c);
+        if (this.isPlainObject(node)) {
+          const out: Record<string, RuntimeValue> = {};
+          for (const [k, v] of Object.entries(node as Record<string, SExpr>)) out[k] = visit(v, [...path, k], c);
+          return out;
+        }
+        if (Array.isArray(node)) return node.map((item, i) => visit(item as SExpr, [...path, i], c));
+        return node;
+      }
+      const op = getOperator(node)!;
+      const args = getArgs(node);
+      const consumed = new Set<number>();
+      const childPath = (child: SExpr): SExprPath | null => {
+        if (typeof child === 'object' && child !== null) return paths.get(child) ?? null;
+        let first = -1;
+        for (let i = 0; i < args.length; i++) {
+          if (args[i] !== child) continue;
+          if (first < 0) first = i;
+          if (!consumed.has(i)) { consumed.add(i); return [...path, i + 1]; }
+        }
+        return first < 0 ? null : [...path, first + 1];
+      };
+      const tracedChild: Evaluator = (child, c2) => {
+        const p = childPath(child);
+        return p === null ? this.evaluate(child, c2) : visit(child, p, c2);
+      };
+      const result = this.dispatchOperator(op, args, c, tracedChild);
+      const value = result === UNKNOWN_OPERATOR ? node.map((item, i) => visit(item as SExpr, [...path, i], c)) : result;
+      args.forEach((_, i) => {
+        const p = [...path, i + 1];
+        if (!ranUnder(p)) trace.push({ kind: 'skip', path: p });
+      });
+      return value;
+    };
+
+    try {
+      return { value: visit(expr, [], ctx), trace };
+    } catch (err) {
+      return { trace, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  /**
    * Dispatch to the appropriate operator implementation.
    */
   /**
    * Dispatch to the appropriate operator implementation.
    */
-  private dispatchOperator(op: string, args: SExpr[], ctx: EvaluationContext): RuntimeValue {
+  private dispatchOperator(op: string, args: SExpr[], ctx: EvaluationContext, evaluate: Evaluator = this.boundInterpret): RuntimeValue {
     // Parity with the compiled path's `resolve_sexpr_call`: a registered
     // operator applied outside its canonical arity bounds throws instead of
     // silently truncating/wrapping (R-EVALUATOR-NO-ARITY-CHECK). Unregistered
@@ -758,7 +842,7 @@ export class SExpressionEvaluator {
     assertOperatorArity(op, args.length);
     const impl = OPERATOR_TABLE[op];
     if (impl === undefined) return UNKNOWN_OPERATOR;
-    return impl(args, this.boundInterpret, ctx);
+    return impl(args, evaluate, ctx);
   }
 }
 
@@ -768,6 +852,10 @@ export const evaluator = new SExpressionEvaluator();
 // Export convenience functions
 export function evaluate(expr: SExpr, ctx: EvaluationContext): RuntimeValue {
   return evaluator.evaluate(expr, ctx);
+}
+
+export function evaluateTraced(expr: SExpr, ctx: EvaluationContext): { value?: RuntimeValue; trace: EvalTrace; error?: string } {
+  return evaluator.evaluateTraced(expr, ctx);
 }
 
 export function evaluateGuard(expr: SExpr, ctx: EvaluationContext): boolean {
