@@ -35,7 +35,7 @@ export {
 export { evalAnd, evalOr, evalNot, evalIf } from './logic.js';
 
 // Control operators
-export { evalLet, evalDo, evalWhen, evalFn } from './control.js';
+export { evalLet, evalDo, evalWhen, evalFn, lambdaSourceOf } from './control.js';
 
 // Collection operators
 export {

@@ -131,6 +131,10 @@ describe('compile parity: unit corpus', () => {
     ['state binding', ['==', '@state', 'active']],
     ['filter + find', ['array/find', ['array/filter', '@entity.items', ['fn', 'n', ['>', '@n', 1]]], ['fn', 'm', ['==', '@m', 2]]]],
     ['nested let+if+lambda', ['let', [['xs', '@entity.items']], ['array/map', '@xs', ['fn', 'q', ['if', ['>', '@q', 1], '@q', 0]]]]],
+    // A binding / parameter NAME that is also an operator name is a name, never a call
+    // (std-algo-bubblesort binds `swap`, an operator; G-EVALUATOR-002).
+    ['let binding named like an operator', ['let', [['swap', ['>', '@entity.x', 1]], ['count', 2]], ['if', '@swap', '@count', 0]]],
+    ['fn params named like operators', ['array/map', '@entity.items', ['fn', ['swap'], ['*', '@swap', 2]]]],
   ];
 
   for (const [label, tree] of corpus) {

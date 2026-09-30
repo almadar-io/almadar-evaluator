@@ -74,6 +74,16 @@ export function evalWhen(args: SExpr[], evaluate: Evaluator, ctx: EvaluationCont
   return undefined;
 }
 
+// The `(fn …)` each closure was built from. A lambda stored in a literal
+// (a `when:` on an action item) evaluates to a function, which JSON drops at the
+// server bridge; the source lets the caller send the S-expression instead.
+const lambdaSources = new WeakMap<object, SExpr[]>();
+
+/** The `["fn", params, body]` a lambda value the evaluator built came from; `undefined` for anything else. */
+export function lambdaSourceOf(value: RuntimeValue): SExpr[] | undefined {
+  return typeof value === 'function' ? lambdaSources.get(value) : undefined;
+}
+
 /**
  * Evaluate lambda: ["fn", varName, body] or ["fn", [vars], body]
  * Creates a function that can be passed to collection operators.
@@ -87,7 +97,7 @@ export function evalFn(
   const body = args[1];
 
   // Return a closure that can be called with an item
-  return (item: RuntimeValue, evaluate: Evaluator, ctx: EvaluationContext) => {
+  const closure = (item: RuntimeValue, evaluate: Evaluator, ctx: EvaluationContext) => {
     const locals = new Map<string, RuntimeValue>();
 
     // Handle single variable or array of variables
@@ -103,4 +113,6 @@ export function evalFn(
     const childCtx = createChildContext(ctx, locals);
     return evaluate(body, childCtx);
   };
+  lambdaSources.set(closure, ['fn', params, body]);
+  return closure;
 }

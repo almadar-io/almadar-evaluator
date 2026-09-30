@@ -12,7 +12,7 @@ import type { EvaluationContext } from '../context.js';
 
 type EvalFn = (expr: SExpr, ctx: EvaluationContext) => unknown;
 
-type TimeUnit = 'year' | 'month' | 'week' | 'day' | 'hour' | 'minute' | 'second' | 'ms';
+type TimeUnit = 'year' | 'quarter' | 'month' | 'week' | 'day' | 'hour' | 'minute' | 'second' | 'ms';
 
 const MS_PER_SECOND = 1000;
 const MS_PER_MINUTE = 60 * MS_PER_SECOND;
@@ -50,12 +50,14 @@ const TIME_UNIT_ALIASES: Readonly<Record<string, TimeUnit>> = {
   weeks: 'week',
   month: 'month',
   months: 'month',
+  quarter: 'quarter',
+  quarters: 'quarter',
   year: 'year',
   years: 'year',
 };
 
 const TIME_UNIT_VOCABULARY =
-  'ms|millisecond(s), s|second(s), m|minute(s), h|hour(s), d|day(s), w|week(s), month(s), year(s)';
+  'ms|millisecond(s), s|second(s), m|minute(s), h|hour(s), d|day(s), w|week(s), month(s), quarter(s), year(s)';
 
 /**
  * Resolve a unit literal, throwing on anything outside the vocabulary. An
@@ -72,7 +74,7 @@ function parseTimeUnit(unit: unknown): TimeUnit {
   return resolved;
 }
 
-/** Fixed-length units in ms. `month`/`year` have no fixed length. */
+/** Fixed-length units in ms. `month`/`quarter`/`year` have no fixed length. */
 const FIXED_UNIT_MS: Readonly<Partial<Record<TimeUnit, number>>> = {
   ms: 1,
   second: MS_PER_SECOND,
@@ -110,7 +112,8 @@ function addCalendarMonths(ts: number, months: number): number {
 function shiftTime(ts: number, amount: number, unit: TimeUnit): number {
   const fixed = FIXED_UNIT_MS[unit];
   if (fixed !== undefined) return ts + amount * fixed;
-  return addCalendarMonths(ts, unit === 'year' ? Math.trunc(amount) * 12 : Math.trunc(amount));
+  const monthsPer = unit === 'year' ? 12 : unit === 'quarter' ? 3 : 1;
+  return addCalendarMonths(ts, Math.trunc(amount) * monthsPer);
 }
 
 /**
@@ -138,6 +141,10 @@ function startOf(ts: number, unit: TimeUnit): number {
     case 'month': {
       const d = new Date(ts);
       return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+    }
+    case 'quarter': {
+      const d = new Date(ts);
+      return Date.UTC(d.getUTCFullYear(), Math.floor(d.getUTCMonth() / 3) * 3, 1);
     }
     case 'year':
       return Date.UTC(new Date(ts).getUTCFullYear(), 0, 1);
@@ -391,7 +398,7 @@ export function evalTimeDiff(
   if (fixed !== undefined) return Math.trunc(diffMs / fixed);
 
   const months = wholeMonthsBetween(b, a);
-  return unit === 'year' ? Math.trunc(months / 12) : months;
+  return unit === 'year' ? Math.trunc(months / 12) : unit === 'quarter' ? Math.trunc(months / 3) : months;
 }
 
 /**

@@ -523,6 +523,27 @@ const OPERATOR_TABLE: Record<string, OpImpl> = {
   'data/pad': stdData.evalDataPad,
 };
 
+/**
+ * The children of an operator node the interpreter EVALUATES — what the
+ * compiler may compile. A special form's names are not expressions: a `let`
+ * binding's name and an `fn` parameter list stay data even when they spell an
+ * operator (`(let ((swap …)) …)`, std-algo-bubblesort; G-EVALUATOR-002).
+ */
+function evaluatedChildren(op: string, expr: SExpr[], dispatched: boolean): SExpr[] {
+  if (!dispatched) return expr;
+  if (op === 'let') {
+    const [, bindings, ...body] = expr;
+    const values = Array.isArray(bindings)
+      ? (bindings as SExpr[]).map((pair) => (Array.isArray(pair) ? (pair as SExpr[])[1] : pair))
+      : typeof bindings === 'object' && bindings !== null
+        ? Object.values(bindings as Record<string, SExpr>)
+        : [];
+    return [...values.filter((v): v is SExpr => v !== undefined), ...body];
+  }
+  if (op === 'fn' || op === 'lambda') return expr.slice(2);
+  return expr;
+}
+
 export class SExpressionEvaluator {
   /**
    * Tier-up compilation cache, keyed by node IDENTITY: schema trees are
@@ -657,8 +678,8 @@ export class SExpressionEvaluator {
       const impl = OPERATOR_TABLE[op];
       // Children are compiled either way: the data-array fallback reduces
       // the whole array (operator head included — a constant string).
-      for (const item of expr) {
-        if (!into.has(item as SExpr)) this.compileNode(item as SExpr, into, dispatch);
+      for (const item of evaluatedChildren(op, expr as SExpr[], impl !== undefined)) {
+        if (!into.has(item)) this.compileNode(item, into, dispatch);
       }
       if (impl === undefined) {
         fn = (ctx) => (expr as SExpr[]).map((item) => {

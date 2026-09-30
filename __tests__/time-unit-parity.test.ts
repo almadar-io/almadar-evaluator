@@ -111,4 +111,19 @@ describe('time unit vocabulary — parity with orbital-core', () => {
     expect(ev(['time/isSame', MAR_31_2024, MAR_1_2024, 'day'])).toBe(false);
     expect(ev(['time/isSame', JAN_15_2024, MAR_31_2024, 'year'])).toBe(true);
   });
+
+  it('quarter is a calendar unit: 3-month buckets, shifts and whole-quarter diffs', () => {
+    const Q1_2024 = 1_704_067_200_000;
+    const JUN_30_2024_SAME_TIME = 1_719_750_896_789;
+    const MAR_31_2024_LAST_MS = 1_711_929_599_999;
+    const APR_1_2024_SAME_TIME = 1_711_974_896_789;
+    expect(num(['time/startOf', MAR_31_2024, 'quarter'])).toBe(Q1_2024);
+    expect(num(['time/endOf', MAR_31_2024, 'quarter'])).toBe(MAR_31_2024_LAST_MS);
+    expect(num(['time/add', MAR_31_2024, 1, 'quarter'])).toBe(JUN_30_2024_SAME_TIME);
+    // Whole quarters, like whole months: 15 Jan → 15 Apr is one; 31 Mar → 30 Jun (clamped) is not.
+    expect(num(['time/diff', 1_713_139_200_000, JAN_15_2024, 'quarter'])).toBe(1);
+    expect(num(['time/diff', JUN_30_2024_SAME_TIME, MAR_31_2024, 'quarter'])).toBe(0);
+    expect(ev(['time/isSame', JAN_15_2024, MAR_31_2024, 'quarter'])).toBe(true);
+    expect(ev(['time/isSame', MAR_31_2024, APR_1_2024_SAME_TIME, 'quarter'])).toBe(false);
+  });
 });
