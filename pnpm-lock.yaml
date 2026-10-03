@@ -9,15 +9,15 @@ importers:
   .:
     dependencies:
       '@almadar/core':
-        specifier: ^10.112.0
-        version: 10.112.0
+        specifier: ^10.116.0
+        version: 10.116.0
       '@almadar/std':
-        specifier: ^16.236.0
-        version: 16.236.0
+        specifier: ^16.241.0
+        version: 16.241.0
     devDependencies:
       '@almadar/eslint-plugin':
-        specifier: ^2.20.0
-        version: 2.20.0(eslint@10.0.0)
+        specifier: ^2.21.0
+        version: 2.21.0(eslint@10.0.0)
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
@@ -45,16 +45,16 @@ importers:
 
 packages:
 
-  '@almadar/core@10.112.0':
-    resolution: {integrity: sha512-LIVI6dMmJorlzP63Ciq1scimnHV8WhYuJSQdHgEFG7bKYg2/2Vg5JlfUMWVkh5wEgoQGVRAvEVWEkJcDN+/apw==}
+  '@almadar/core@10.116.0':
+    resolution: {integrity: sha512-r6ftuzv17L0kRUgezNDMFcVrXxM6iDpE9WDvSUPhBn+eLi8RGh6ZDPecFaAs4SXQFvGc25AzIrMqTDaL+Svspg==}
 
-  '@almadar/eslint-plugin@2.20.0':
-    resolution: {integrity: sha512-f3kUaZqFJYC38tL/FZxEel2cm//288/MbCYCykyHFtie33XHQPyVyocrjyP8XQsbt+SlZ22X3tzo313/y2yKIg==}
+  '@almadar/eslint-plugin@2.21.0':
+    resolution: {integrity: sha512-H010BxnM/s2v17EcFzh3hGTD1o3AJCBLqrmh1Fupvgdq2oP/PDicU5XAWTYt9apdIiM5yDs11trUT3BYFkGqCA==}
     peerDependencies:
       eslint: '>=8.0.0'
 
-  '@almadar/std@16.236.0':
-    resolution: {integrity: sha512-QcRXlfG1LpkiBr+rMSPyCZ3a1FhcSN8F1KwH/ddItlenSVwySTS1PXGC5YoHG65wB2R2IR4DOv/nxuyMxtI/0w==}
+  '@almadar/std@16.241.0':
+    resolution: {integrity: sha512-6ob2m4QSusF1A0Z8HeFDzmdvn7tRO9bqIPfrsAvqcjn5pssDLsuvgFrHj8tf6+Yh62+zPcSAXg8SuYYkx9x+Ng==}
 
   '@esbuild/aix-ppc64@0.21.5':
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
@@ -1424,18 +1424,18 @@ packages:
 
 snapshots:
 
-  '@almadar/core@10.112.0':
+  '@almadar/core@10.116.0':
     dependencies:
       zod: 3.25.76
 
-  '@almadar/eslint-plugin@2.20.0(eslint@10.0.0)':
+  '@almadar/eslint-plugin@2.21.0(eslint@10.0.0)':
     dependencies:
       eslint: 10.0.0
       jsonc-eslint-parser: 3.1.0
 
-  '@almadar/std@16.236.0':
+  '@almadar/std@16.241.0':
     dependencies:
-      '@almadar/core': 10.112.0
+      '@almadar/core': 10.116.0
 
   '@esbuild/aix-ppc64@0.21.5':
     optional: true

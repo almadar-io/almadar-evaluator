@@ -92,9 +92,10 @@ function deepEqual(a: unknown, b: unknown): boolean {
   // Primitive equality
   if (a === b) return true;
 
-  // Null/undefined checks
-  if (a === null || b === null) return a === b;
-  if (a === undefined || b === undefined) return a === b;
+  // A missing value is null, as in orbital-core (its Value has no undefined).
+  const aNull = a === null || a === undefined;
+  const bNull = b === null || b === undefined;
+  if (aNull || bNull) return aNull && bNull;
 
   // Type checks
   if (typeof a !== typeof b) return false;

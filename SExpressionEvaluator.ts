@@ -82,6 +82,7 @@ import * as stdJson from './std/json.js';
 import * as stdValidate from './std/validate.js';
 import * as stdTime from './std/time.js';
 import * as stdFormat from './std/format.js';
+import * as stdI18n from './std/i18n.js';
 import * as stdAsync from './std/async.js';
 import * as stdProb from './std/prob.js';
 import * as stdOs from './std/os.js';
@@ -420,6 +421,7 @@ const OPERATOR_TABLE: Record<string, OpImpl> = {
   'time/duration': stdTime.evalTimeDuration,
   'format/number': stdFormat.evalFormatNumber,
   'format/currency': stdFormat.evalFormatCurrency,
+  'i18n/t': stdI18n.evalI18nT,
   'format/percent': stdFormat.evalFormatPercent,
   'format/bytes': stdFormat.evalFormatBytes,
   'format/ordinal': stdFormat.evalFormatOrdinal,

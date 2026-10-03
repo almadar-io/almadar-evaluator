@@ -270,6 +270,9 @@ export {
   evalFormatCreditCard,
 } from './format.js';
 
+// I18n operators
+export { evalI18nT } from './i18n.js';
+
 // Async operators
 export {
   evalAsyncDelay,

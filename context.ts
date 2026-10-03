@@ -83,6 +83,12 @@ export interface EvaluationContext {
    */
   currentTheme?: string;
 
+  /** `@locale`: the active locale code — the catalog `i18n/t` reads. */
+  locale?: string;
+
+  /** The active locale's merged catalog (qualified key → message) for `i18n/t`. */
+  messages?: Readonly<Record<string, string>>;
+
   /** `@event`: the delivery being processed (`deliveryRecordValue`, Runtime Spec Clause 5.5). */
   event?: EventPayload;
   /** `@prevEvents`: deliveries this trait already received this dispatch, in order. */
@@ -337,6 +343,8 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): Runtime
         // Render-resolved schema sigil — the `data-theme` key string derived
         // from `Orbital.theme`. Bare root (no path); render-context only.
         return ctx.currentTheme;
+      case 'locale':
+        return ctx.locale;
       case 'event':
         value = ctx.event;
         break;
@@ -388,5 +396,27 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): Runtime
     );
   }
 
+  // A config value that is itself a binding (`navItems = @pages`) resolves through, as the
+  // compiled path substitutes it (inline rewrite_config_bindings); client-only targets and a
+  // self-reference stay raw.
+  if (
+    root === 'config' &&
+    !ctx.locals?.has(root) &&
+    typeof value === 'string' &&
+    /^@[^\s]+$/.test(value) &&
+    !CLIENT_ONLY_BINDING_ROOTS.has(parseBindingPath(value.slice(1)).root) &&
+    !inFlightConfigBindings.has(binding)
+  ) {
+    inFlightConfigBindings.add(binding);
+    try {
+      return resolveBinding(value, ctx);
+    } finally {
+      inFlightConfigBindings.delete(binding);
+    }
+  }
+
   return value;
 }
+
+/** Config bindings being resolved through, so a self-referencing default stops. */
+const inFlightConfigBindings = new Set<string>();

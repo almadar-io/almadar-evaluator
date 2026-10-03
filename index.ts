@@ -52,6 +52,7 @@ export {
 
 // Listen-route `with { ... }` mapping evaluation (payload-only context)
 export { evaluateListenPayloadExpr } from './listen-payload.js';
+export { EvalTypeMismatchError, runtimeTypeName } from './errors.js';
 
 // Operators (for advanced use cases)
 export * from './operators/index.js';
