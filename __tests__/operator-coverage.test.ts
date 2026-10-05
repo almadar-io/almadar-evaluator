@@ -94,9 +94,12 @@ export const KNOWN_GAPS: readonly string[] = [
   'validate/validate',
 ];
 
+/** Effects that need state only the running app holds, so `@almadar/runtime` executes them: `cancel-call` aborts a keyed call through the app's in-flight call registry. */
+export const RUNTIME_ONLY: readonly string[] = ['cancel-call'];
+
 describe('operator coverage: every std operator is dispatched or explicitly allowlisted', () => {
   it('has no operator with neither a dispatch case nor an allowlist entry', () => {
-    const allowlisted = new Set([...PYTHON_ONLY, ...KNOWN_GAPS]);
+    const allowlisted = new Set([...PYTHON_ONLY, ...KNOWN_GAPS, ...RUNTIME_ONLY]);
     const missing = getAllStdOperators().filter(
       (name) => !DISPATCHED.has(name) && !allowlisted.has(name)
     );

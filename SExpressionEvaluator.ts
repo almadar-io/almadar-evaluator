@@ -12,6 +12,7 @@ import { assertOperatorArity } from '@almadar/std/registry';
 import { isSExpr, isBinding, getOperator, getArgs } from './types/expression.js';
 import type { EvaluationContext, Evaluator } from './context.js';
 import type { EvalTrace, RuntimeValue, SExprPath } from '@almadar/core';
+import { decodeQuoteBody } from '@almadar/core';
 import { resolveBinding } from './context.js';
 
 // Import operators
@@ -135,6 +136,14 @@ function assertNotAmbiguousConcat(op: string): void {
   }
 }
 
+function evalQuote(args: SExpr[]): RuntimeValue {
+  const body = args[0];
+  if (typeof body !== 'string') {
+    throw new Error('quote: expected an encoded quote body (string)');
+  }
+  return decodeQuoteBody(body);
+}
+
 /**
  * S-Expression Evaluator class.
  *
@@ -175,6 +184,8 @@ const OPERATOR_TABLE: Record<string, OpImpl> = {
   'when': evalWhen,
   'fn': evalFn,
   'lambda': evalFn,
+  // G-CROSS-041: an S-expression held as data — its encoded body decodes verbatim, never evaluated.
+  'quote': evalQuote,
   'map': evalMap,
   'filter': evalFilter,
   'find': evalFind,
@@ -543,6 +554,7 @@ function evaluatedChildren(op: string, expr: SExpr[], dispatched: boolean): SExp
     return [...values.filter((v): v is SExpr => v !== undefined), ...body];
   }
   if (op === 'fn' || op === 'lambda') return expr.slice(2);
+  if (op === 'quote') return [];
   return expr;
 }
 
