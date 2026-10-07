@@ -15,6 +15,37 @@ import type { RuntimeValue } from '@almadar/core';
 import { EvalTypeMismatchError, runtimeTypeName } from '../errors.js';
 
 /** orbital-core `require_array!`: the value an array operator was given, or a TypeMismatch. */
+/** Twin of orbital-core `Value::to_number`: numbers, booleans (1/0), null (0) and
+ *  numeric strings read as numbers; anything else reads as none. */
+function toNumber(value: RuntimeValue): number | undefined {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  if (value === null) return 0;
+  if (typeof value === 'string' && value !== '' && !Number.isNaN(Number(value))) return Number(value);
+  return undefined;
+}
+
+/** The numbers `array/max` / `array/min` fold (orbital-core `numbers_of`): each element,
+ *  or its field `args[1]`, read through `toNumber`; one that reads as none is skipped. */
+function numbersOf(args: SExpr[], evaluate: EvalFn, ctx: EvaluationContext): number[] {
+  const arr = requireArray(evaluate(args[0], ctx));
+  const key = args.length > 1 ? evaluate(args[1], ctx) : undefined;
+  if (key !== undefined && typeof key !== 'string') throw new EvalTypeMismatchError('string', runtimeTypeName(key));
+  const out: number[] = [];
+  for (const item of arr) {
+    const value = key === undefined ? item : fieldOf(item, key);
+    const n = value === undefined ? undefined : toNumber(value);
+    if (n !== undefined) out.push(n);
+  }
+  return out;
+}
+
+/** `item[key]` when `item` is a plain object holding `key`, else none. */
+function fieldOf(item: RuntimeValue, key: string): RuntimeValue | undefined {
+  if (item === null || typeof item !== 'object' || Array.isArray(item) || !(key in item)) return undefined;
+  return Reflect.get(item, key);
+}
+
 function requireArray(value: unknown): RuntimeValue[] {
   if (Array.isArray(value)) return value as RuntimeValue[];
   throw new EvalTypeMismatchError('array', runtimeTypeName(value));
@@ -631,18 +662,9 @@ export function evalArrayMin(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): number {
-  const arr = requireArray(evaluate(args[0], ctx));
-  if (arr.length === 0) return 0;
-
-  const key = args.length > 1 ? (evaluate(args[1], ctx) as string) : undefined;
-
-  const values = arr.map((item) => {
-    const value = key ? (item as Record<string, unknown>)[key] : item;
-    return typeof value === 'number' ? value : Infinity;
-  });
-
-  return Math.min(...values);
+): number | null {
+  const numbers = numbersOf(args, evaluate, ctx);
+  return numbers.length > 0 ? Math.min(...numbers) : null;
 }
 
 /**
@@ -652,18 +674,9 @@ export function evalArrayMax(
   args: SExpr[],
   evaluate: EvalFn,
   ctx: EvaluationContext
-): number {
-  const arr = requireArray(evaluate(args[0], ctx));
-  if (arr.length === 0) return 0;
-
-  const key = args.length > 1 ? (evaluate(args[1], ctx) as string) : undefined;
-
-  const values = arr.map((item) => {
-    const value = key ? (item as Record<string, unknown>)[key] : item;
-    return typeof value === 'number' ? value : -Infinity;
-  });
-
-  return Math.max(...values);
+): number | null {
+  const numbers = numbersOf(args, evaluate, ctx);
+  return numbers.length > 0 ? Math.max(...numbers) : null;
 }
 
 /**
