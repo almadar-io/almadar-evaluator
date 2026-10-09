@@ -85,17 +85,18 @@ export const KNOWN_GAPS: readonly string[] = [
   'behavior/wire',
   'behavior/detect-layout',
   'behavior/pipe',
-  // behavior.ts
-  'compose/compose-all',
-  'compose/compose-children',
-  'behavior/instantiate',
-  'behavior/call',
-  'lolo/emit-body',
-  'validate/validate',
 ];
 
-/** Effects that need state only the running app holds, so `@almadar/runtime` executes them: `cancel-call` aborts a keyed call through the app's in-flight call registry. */
-export const RUNTIME_ONLY: readonly string[] = ['cancel-call'];
+/**
+ * Effects that need state only the running app or its host holds, so `@almadar/runtime` executes them:
+ * `cancel-call` aborts a keyed call through the app's in-flight call registry; the behavior reflection and
+ * program effects read the host's installed behavior packages through `orb`.
+ */
+export const RUNTIME_ONLY: readonly string[] = [
+  'cancel-call',
+  'behavior/catalog', 'behavior/describe', 'behavior/source',
+  'program/read', 'program/print', 'program/eval', 'program/compose',
+];
 
 describe('operator coverage: every std operator is dispatched or explicitly allowlisted', () => {
   it('has no operator with neither a dispatch case nor an allowlist entry', () => {

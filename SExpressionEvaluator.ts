@@ -87,6 +87,7 @@ import * as stdI18n from './std/i18n.js';
 import * as stdAsync from './std/async.js';
 import * as stdProb from './std/prob.js';
 import * as stdOs from './std/os.js';
+import * as stdBehavior from './std/behavior.js';
 import * as stdContract from './std/contract.js';
 import * as stdGraph from './std/graph.js';
 import * as stdData from './std/data.js';
@@ -186,6 +187,9 @@ const OPERATOR_TABLE: Record<string, OpImpl> = {
   'lambda': evalFn,
   // G-CROSS-041: an S-expression held as data — its encoded body decodes verbatim, never evaluated.
   'quote': evalQuote,
+  'quasiquote': stdBehavior.evalQuasiquote,
+  'behavior/apply': stdBehavior.evalBehaviorApply,
+  'unquote': stdBehavior.evalUnquote,
   'map': evalMap,
   'filter': evalFilter,
   'find': evalFind,
