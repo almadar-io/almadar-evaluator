@@ -76,3 +76,22 @@ describe('quasiquote', () => {
     expect(() => ev.evaluate(ir, ctx())).toThrow(/program data/);
   });
 });
+
+describe('behavior/ref', () => {
+  it('builds a behavior value from a literal or computed specifier', () => {
+    const ev = new SExpressionEvaluator();
+    expect(ev.evaluate(['behavior/ref', './orbitals/shop'], ctx())).toEqual({ behavior: './orbitals/shop' });
+    const computed = createMinimalContext({ written: 'almadar-behaviors/std-crm' }, {});
+    expect(ev.evaluate(['behavior/ref', '@entity.written'], computed)).toEqual({ behavior: 'almadar-behaviors/std-crm' });
+  });
+
+  it('refuses a string that is not a specifier', () => {
+    const ev = new SExpressionEvaluator();
+    expect(() => ev.evaluate(['behavior/ref', 'shop'], ctx())).toThrow(/specifier/);
+  });
+
+  it('control: refuses a non-string', () => {
+    const ev = new SExpressionEvaluator();
+    expect(() => ev.evaluate(['behavior/ref', '@entity.n'], ctx())).toThrow(/string/);
+  });
+});

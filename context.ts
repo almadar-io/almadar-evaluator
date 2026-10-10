@@ -248,10 +248,10 @@ export function createChildContext(
 /**
  * Binding roots whose values only exist in client UI state (e.g. `@trait.*`
  * resolves to another trait's current `render-ui` output, which lives in
- * `@almadar/ui`'s slot manager, not on the server). Evaluator returns
- * `undefined` for these without emitting a strict-mode warning — they're
- * expected to round-trip through the server verbatim and be substituted at
- * render time. Mirrors `CLIENT_ONLY_BINDING_ROOTS` in
+ * `@almadar/ui`'s slot manager, not on the server). The evaluator returns
+ * the token itself, without a strict-mode warning, so it round-trips
+ * verbatim — also from inside an evaluated `if` branch or map body — and is
+ * substituted at render time. Mirrors `CLIENT_ONLY_BINDING_ROOTS` in
  * `@almadar/runtime/BindingResolver`.
  */
 const CLIENT_ONLY_BINDING_ROOTS: ReadonlySet<string> = new Set(['trait']);
@@ -294,10 +294,9 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): Runtime
 
   const { root, path } = parseBindingPath(binding.slice(1));
 
-  // Client-only bindings never resolve server-side. Short-circuit so
-  // strict-mode warnings don't fire on intentional-unresolved paths.
+  // Client-only bindings evaluate to themselves: the renderer substitutes them.
   if (CLIENT_ONLY_BINDING_ROOTS.has(root)) {
-    return undefined;
+    return binding;
   }
 
   let value: RuntimeValue;

@@ -189,6 +189,7 @@ const OPERATOR_TABLE: Record<string, OpImpl> = {
   'quote': evalQuote,
   'quasiquote': stdBehavior.evalQuasiquote,
   'behavior/apply': stdBehavior.evalBehaviorApply,
+  'behavior/ref': stdBehavior.evalBehaviorRef,
   'unquote': stdBehavior.evalUnquote,
   'map': evalMap,
   'filter': evalFilter,

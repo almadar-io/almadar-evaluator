@@ -10,6 +10,7 @@ import {
   BehaviorValueSchema,
   JsonValueSchema,
   applyBehaviorOverrides,
+  behaviorRef,
   instantiateQuasiquote,
   toProgramData,
   type RuntimeValue,
@@ -34,6 +35,13 @@ export function evalBehaviorApply(args: SExpr[], evaluate: EvalFn, ctx: Evaluati
   } catch (error) {
     throw new Error(`behavior/apply: overrides do not fit this kind of value: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/** behavior/ref — a whole behavior as a value, from its specifier. */
+export function evalBehaviorRef(args: SExpr[], evaluate: EvalFn, ctx: EvaluationContext): RuntimeValue {
+  const specifier = evaluate(args[0], ctx);
+  if (typeof specifier !== 'string') throw new Error('behavior/ref: the specifier must be a string');
+  return behaviorRef(specifier);
 }
 
 /** (quasiquote x) — the template with each hole's value spliced in. */
