@@ -20,6 +20,7 @@ import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import type { SExpr, RuntimeValue } from '@almadar/core';
 import { SExpressionEvaluator } from '../SExpressionEvaluator.js';
+import { behaviorRegistryDir, discoverBehaviorPackages } from '@almadar/core/behavior-package';
 import { createMinimalContext, type EvaluationContext } from '../context.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -197,10 +198,10 @@ function collectTrees(node: RuntimeValue, into: SExpr[]): void {
 }
 
 describe('compile parity: registry sweep', () => {
-  const registries = [
-    path.join(here, '../../almadar-std/behaviors/registry'),
-    path.join(here, '../../almadar-behaviors/behaviors/registry'),
-  ].filter((dir) => existsSync(dir)); // absent in a standalone (extracted) clone
+  // Every behavior package installed for this package, through its manifest (a
+  // live package's lowered mirror, a published one's registry); none in a
+  // standalone clone.
+  const registries = discoverBehaviorPackages(here).map((pkg) => behaviorRegistryDir(pkg));
   const sweepAvailable = registries.length > 0;
   const trees: Array<{ file: string; tree: SExpr }> = [];
   for (const reg of registries) {

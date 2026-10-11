@@ -9,6 +9,7 @@
 
 import type { AgentContext, LlmContext, WorkspaceContext, SessionContext, MemoryContext, TraceContext, IntegrationContext, TraitConfig, NavItem, EntityRow, EventPayload, FieldValue, RuntimeValue } from '@almadar/core';
 import type { SExpr } from './types/expression.js';
+import { decodeQuotedValue } from '@almadar/core';
 
 /**
  * User context for `@user` bindings — owned by `@almadar/core` so the
@@ -362,9 +363,11 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): Runtime
     }
   }
 
-  // Navigate path
+  // Navigate path. A quoted value (`(quote x)`) is its data: decode it at each
+  // step so a dotted path reaches inside (G-CROSS-076).
   for (let i = 0; i < path.length; i++) {
     const segment = path[i];
+    value = decodeQuotedValue(value);
     if (value === null || value === undefined) {
       if (ctx.strictBindings) {
         const resolvedSoFar = [root, ...path.slice(0, i)].join('.');
@@ -388,6 +391,8 @@ export function resolveBinding(binding: string, ctx: EvaluationContext): Runtime
       return undefined;
     }
   }
+
+  value = decodeQuotedValue(value);
 
   if (value === undefined && path.length > 0 && ctx.strictBindings) {
     console.warn(
