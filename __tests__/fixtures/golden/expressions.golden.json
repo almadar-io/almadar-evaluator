@@ -1,0 +1,334 @@
+{
+    "$schema": "Golden file for cross-language evaluator parity",
+    "description": "Both Rust (orbital-core) and TypeScript (almadar-evaluator) must produce identical outputs for these inputs.",
+    "cases": {
+        "arithmetic": [
+            {
+                "input": [
+                    "+",
+                    1,
+                    2
+                ],
+                "expected": 3
+            },
+            {
+                "input": [
+                    "+",
+                    1,
+                    2,
+                    3
+                ],
+                "expected": 6
+            },
+            {
+                "input": [
+                    "-",
+                    10,
+                    3
+                ],
+                "expected": 7
+            },
+            {
+                "input": [
+                    "*",
+                    4,
+                    5
+                ],
+                "expected": 20
+            },
+            {
+                "input": [
+                    "/",
+                    10,
+                    2
+                ],
+                "expected": 5
+            },
+            {
+                "input": [
+                    "%",
+                    7,
+                    3
+                ],
+                "expected": 1
+            },
+            {
+                "input": [
+                    "abs",
+                    -5
+                ],
+                "expected": 5
+            },
+            {
+                "input": [
+                    "min",
+                    3,
+                    7,
+                    1
+                ],
+                "expected": 1
+            },
+            {
+                "input": [
+                    "max",
+                    3,
+                    7,
+                    1
+                ],
+                "expected": 7
+            },
+            {
+                "input": [
+                    "clamp",
+                    150,
+                    0,
+                    100
+                ],
+                "expected": 100
+            },
+            {
+                "input": [
+                    "clamp",
+                    -10,
+                    0,
+                    100
+                ],
+                "expected": 0
+            },
+            {
+                "input": [
+                    "floor",
+                    3.7
+                ],
+                "expected": 3
+            },
+            {
+                "input": [
+                    "ceil",
+                    3.2
+                ],
+                "expected": 4
+            },
+            {
+                "input": [
+                    "round",
+                    3.5
+                ],
+                "expected": 4
+            }
+        ],
+        "comparison": [
+            {
+                "input": [
+                    "=",
+                    5,
+                    5
+                ],
+                "expected": true
+            },
+            {
+                "input": [
+                    "=",
+                    5,
+                    3
+                ],
+                "expected": false
+            },
+            {
+                "input": [
+                    "!=",
+                    5,
+                    3
+                ],
+                "expected": true
+            },
+            {
+                "input": [
+                    ">",
+                    5,
+                    3
+                ],
+                "expected": true
+            },
+            {
+                "input": [
+                    ">",
+                    3,
+                    5
+                ],
+                "expected": false
+            },
+            {
+                "input": [
+                    "<",
+                    3,
+                    5
+                ],
+                "expected": true
+            },
+            {
+                "input": [
+                    ">=",
+                    5,
+                    5
+                ],
+                "expected": true
+            },
+            {
+                "input": [
+                    ">=",
+                    4,
+                    5
+                ],
+                "expected": false
+            },
+            {
+                "input": [
+                    "<=",
+                    5,
+                    5
+                ],
+                "expected": true
+            }
+        ],
+        "logic": [
+            {
+                "input": [
+                    "and",
+                    true,
+                    true
+                ],
+                "expected": true
+            },
+            {
+                "input": [
+                    "and",
+                    true,
+                    false
+                ],
+                "expected": false
+            },
+            {
+                "input": [
+                    "or",
+                    false,
+                    true
+                ],
+                "expected": true
+            },
+            {
+                "input": [
+                    "or",
+                    false,
+                    false
+                ],
+                "expected": false
+            },
+            {
+                "input": [
+                    "not",
+                    true
+                ],
+                "expected": false
+            },
+            {
+                "input": [
+                    "not",
+                    false
+                ],
+                "expected": true
+            }
+        ],
+        "string": [
+            {
+                "input": [
+                    "str/upper",
+                    "hello"
+                ],
+                "expected": "HELLO"
+            },
+            {
+                "input": [
+                    "str/lower",
+                    "HELLO"
+                ],
+                "expected": "hello"
+            },
+            {
+                "input": [
+                    "str/len",
+                    "hello"
+                ],
+                "expected": 5
+            },
+            {
+                "input": [
+                    "str/concat",
+                    "hello",
+                    " ",
+                    "world"
+                ],
+                "expected": "hello world"
+            }
+        ],
+        "collection": [
+            {
+                "input": [
+                    "count",
+                    [
+                        1,
+                        2,
+                        3
+                    ]
+                ],
+                "expected": 3
+            },
+            {
+                "input": [
+                    "first",
+                    [
+                        10,
+                        20,
+                        30
+                    ]
+                ],
+                "expected": 10
+            },
+            {
+                "input": [
+                    "last",
+                    [
+                        10,
+                        20,
+                        30
+                    ]
+                ],
+                "expected": 30
+            },
+            {
+                "input": [
+                    "includes",
+                    [
+                        1,
+                        2,
+                        3
+                    ],
+                    2
+                ],
+                "expected": true
+            },
+            {
+                "input": [
+                    "includes",
+                    [
+                        1,
+                        2,
+                        3
+                    ],
+                    5
+                ],
+                "expected": false
+            }
+        ]
+    }
+}

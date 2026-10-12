@@ -1,0 +1,137 @@
+{
+    "$schema": "Golden file for cross-language guard evaluation parity",
+    "description": "Guard expressions must evaluate to the same boolean result in both Rust and TypeScript.",
+    "cases": [
+        {
+            "description": "simple numeric comparison",
+            "expression": [
+                ">",
+                5,
+                0
+            ],
+            "entity": {
+                "health": 100
+            },
+            "expected": true
+        },
+        {
+            "description": "entity binding comparison",
+            "expression": [
+                ">",
+                "@entity.health",
+                0
+            ],
+            "entity": {
+                "health": 100
+            },
+            "expected": true
+        },
+        {
+            "description": "entity at zero",
+            "expression": [
+                ">",
+                "@entity.health",
+                0
+            ],
+            "entity": {
+                "health": 0
+            },
+            "expected": false
+        },
+        {
+            "description": "compound AND guard",
+            "expression": [
+                "and",
+                [
+                    ">",
+                    "@entity.health",
+                    0
+                ],
+                [
+                    "<",
+                    "@entity.health",
+                    200
+                ]
+            ],
+            "entity": {
+                "health": 100
+            },
+            "expected": true
+        },
+        {
+            "description": "compound AND guard (fails left)",
+            "expression": [
+                "and",
+                [
+                    ">",
+                    "@entity.health",
+                    0
+                ],
+                [
+                    "<",
+                    "@entity.health",
+                    200
+                ]
+            ],
+            "entity": {
+                "health": 0
+            },
+            "expected": false
+        },
+        {
+            "description": "OR guard",
+            "expression": [
+                "or",
+                [
+                    "=",
+                    "@entity.status",
+                    "active"
+                ],
+                [
+                    "=",
+                    "@entity.status",
+                    "pending"
+                ]
+            ],
+            "entity": {
+                "status": "active"
+            },
+            "expected": true
+        },
+        {
+            "description": "OR guard (neither match)",
+            "expression": [
+                "or",
+                [
+                    "=",
+                    "@entity.status",
+                    "active"
+                ],
+                [
+                    "=",
+                    "@entity.status",
+                    "pending"
+                ]
+            ],
+            "entity": {
+                "status": "deleted"
+            },
+            "expected": false
+        },
+        {
+            "description": "NOT guard",
+            "expression": [
+                "not",
+                [
+                    "=",
+                    "@entity.locked",
+                    true
+                ]
+            ],
+            "entity": {
+                "locked": false
+            },
+            "expected": true
+        }
+    ]
+}

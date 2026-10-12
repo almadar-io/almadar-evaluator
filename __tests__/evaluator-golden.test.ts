@@ -17,14 +17,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 function loadGolden(name: string) {
-    // __tests__/ → almadar-evaluator/ → packages/ → almadar-test-schemas/
-    const paths = [
-        resolve(__dirname, '../../almadar-test-schemas/expected/evaluator', name),
-    ];
-    for (const p of paths) {
-        try { return JSON.parse(readFileSync(p, 'utf-8')); } catch { }
-    }
-    throw new Error(`Golden file not found: ${name} (tried: ${paths.join(', ')})`);
+    return JSON.parse(readFileSync(resolve(__dirname, 'fixtures/golden', name), 'utf-8'));
 }
 
 // ============================================================================

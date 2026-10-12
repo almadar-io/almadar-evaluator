@@ -9,8 +9,8 @@
  * namespaced ops (`math/*`, `geo/*`, `vec/*`, `str/*`, `array/*`), control flow,
  * and the `and`/`or` divergence probes.
  *
- * Self-contained in-package: does **not** touch the deprecated
- * `almadar-test-schemas` goldens. The `and`/`or` cases use **operand
+ * Self-contained in-package: does **not** read the evaluator golden
+ * fixtures (`__tests__/fixtures/golden`). The `and`/`or` cases use **operand
  * semantics** (Phase 5, R-OR-AND-RETURN-BOOLEAN) — `and`/`or` return the
  * operand value (JS `&&`/`||`), matching the compiled TS path.
  */

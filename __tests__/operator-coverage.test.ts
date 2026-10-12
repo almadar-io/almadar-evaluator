@@ -94,8 +94,8 @@ export const KNOWN_GAPS: readonly string[] = [
  */
 export const RUNTIME_ONLY: readonly string[] = [
   'cancel-call',
-  'behavior/catalog', 'behavior/describe', 'behavior/source',
-  'program/read', 'program/print', 'program/eval', 'program/compose',
+  'behavior/catalog', 'behavior/describe', 'behavior/source', 'behavior/resolve', 'behavior/dependencies',
+  'program/read', 'program/print', 'program/eval', 'program/compose', 'program/step',
 ];
 
 describe('operator coverage: every std operator is dispatched or explicitly allowlisted', () => {
