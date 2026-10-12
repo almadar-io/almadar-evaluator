@@ -7,7 +7,9 @@
  */
 
 import {
+  BehaviorRefSchema,
   BehaviorValueSchema,
+  applyBehaviorRefOverrides,
   JsonValueSchema,
   applyBehaviorOverrides,
   behaviorRef,
@@ -20,17 +22,21 @@ import type { EvaluationContext } from '../context.js';
 
 type EvalFn = (expr: SExpr, ctx: EvaluationContext) => RuntimeValue;
 
-/** behavior/apply — record overrides on a behavior value: §8 call-site overrides on a trait value, the §8b import body on an orbital value. */
+/** behavior/apply — record overrides on a behavior value: §8 call-site overrides on a trait value, the §8b import body on an orbital value, the bridge on a whole behavior value. */
 export function evalBehaviorApply(args: SExpr[], evaluate: EvalFn, ctx: EvaluationContext): RuntimeValue {
-  const value = BehaviorValueSchema.safeParse(evaluate(args[0], ctx));
-  if (!value.success) {
-    throw new Error('behavior/apply: the first argument must be a behavior value ({ behavior, trait } or { behavior, orbital })');
+  const target = evaluate(args[0], ctx);
+  const whole = BehaviorRefSchema.safeParse(target);
+  const value = BehaviorValueSchema.safeParse(target);
+  if (!whole.success && !value.success) {
+    throw new Error('behavior/apply: the first argument must be a behavior value ({ behavior, trait }, { behavior, orbital } or { behavior })');
   }
   const overrides = JsonValueSchema.safeParse(evaluate(args[1], ctx));
   if (!overrides.success) {
     throw new Error(`behavior/apply: the overrides must be plain data: ${overrides.error.message}`);
   }
   try {
+    if (whole.success) return applyBehaviorRefOverrides(whole.data, overrides.data);
+    if (!value.success) throw new Error('not a behavior value');
     return applyBehaviorOverrides(value.data, overrides.data);
   } catch (error) {
     throw new Error(`behavior/apply: overrides do not fit this kind of value: ${error instanceof Error ? error.message : String(error)}`);

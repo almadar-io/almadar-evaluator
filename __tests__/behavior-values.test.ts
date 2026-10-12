@@ -34,6 +34,16 @@ describe('behavior/apply', () => {
     expect(() => ev.evaluate(['behavior/apply', '@entity.widget', { effects: {} }], ctx())).toThrow(/overrides do not fit/);
   });
 
+  it('records a bridge on a whole behavior value', () => {
+    const bridge = { listens: ['SHELL_KEY'], emits: ['STATUS'] };
+    const out = new SExpressionEvaluator().evaluate(['behavior/apply', { behavior: 'almadar-behaviors/vim-mode' }, { bridge }], ctx());
+    expect(out).toEqual({ behavior: 'almadar-behaviors/vim-mode', bridge });
+  });
+
+  it('control: a whole behavior value takes no other override', () => {
+    expect(() => new SExpressionEvaluator().evaluate(['behavior/apply', { behavior: 'almadar-behaviors/vim-mode' }, { config: {} }], ctx())).toThrow(/overrides do not fit/);
+  });
+
   it('records the §8b import body on an orbital value', () => {
     const ev = new SExpressionEvaluator();
     const out = ev.evaluate(['behavior/apply', { behavior: 'almadar-std/std-kanban', orbital: 'KanbanOrbital' }, { entity: 'Task' }], ctx());
