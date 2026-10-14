@@ -201,6 +201,9 @@ export {
   evalJsonStringify,
 } from './json.js';
 
+// CSV operators
+export { evalCsvParse } from './csv.js';
+
 // Validate operators
 export {
   evalValidateRequired,

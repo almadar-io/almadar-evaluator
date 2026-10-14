@@ -79,13 +79,13 @@ const cases: ParityCase[] = [
         expected: false,
     },
     {
-        label: 'or false 42 → 42 (operand semantics)',
-        expr: ['or', false, 42],
+        label: 'or 0 42 → 42 (operand semantics)',
+        expr: ['or', 0, 42],
         expected: 42,
     },
     {
-        label: 'and true "x" → "x" (last truthy operand)',
-        expr: ['and', true, 'x'],
+        label: 'and "y" "x" → "x" (last truthy operand)',
+        expr: ['and', 'y', 'x'],
         expected: 'x',
     },
     {

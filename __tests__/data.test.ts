@@ -27,9 +27,8 @@ describe('data/* operators', () => {
       expect(result.config).toEqual({ note: 'x' });
     });
 
-    it('coerces a non-array first arg to an empty dataset', () => {
-      const result = evaluate(['data/dataset', 'not-an-array', {}], ctx) as DatasetValue;
-      expect(result.data).toEqual([]);
+    it('a non-array first arg raises the typed mismatch, not an empty dataset', () => {
+      expect(() => evaluate(['data/dataset', 'not-an-array', {}], ctx)).toThrow('Type mismatch: expected array, got string');
     });
   });
 

@@ -1,6 +1,6 @@
 {
   "name": "@almadar/evaluator",
-  "version": "2.60.0",
+  "version": "2.61.0",
   "description": "S-expression evaluator for Almadar",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,6 +25,9 @@
     "registry": "https://registry.npmjs.org",
     "access": "public"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsup",
     "build:watch": "tsup --watch",
@@ -34,11 +37,11 @@
     "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
-    "@almadar/core": "^10.127.0",
-    "@almadar/std": "^16.251.0"
+    "@almadar/core": "^10.128.0",
+    "@almadar/std": "^16.253.0"
   },
   "devDependencies": {
-    "@almadar/eslint-plugin": "^2.21.0",
+    "@almadar/eslint-plugin": "^2.22.0",
     "@types/node": "^22.0.0",
     "@typescript-eslint/parser": "8.65.0",
     "eslint": "10.0.0",

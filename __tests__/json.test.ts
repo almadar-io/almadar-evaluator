@@ -20,39 +20,39 @@ describe('json/* operators', () => {
 
   describe('json/parse', () => {
     it('parses a JSON object', () => {
-      expect(evaluate(['json/parse', '{"a": 1, "b": "x"}'], ctx)).toEqual({ a: 1, b: 'x' });
+      expect(evaluate(['json/parse', '{"a": 1, "b": "x"}', 'Row'], ctx)).toEqual({ a: 1, b: 'x' });
     });
 
     it('parses a JSON array', () => {
-      expect(evaluate(['json/parse', '[1, 2, 3]'], ctx)).toEqual([1, 2, 3]);
+      expect(evaluate(['json/parse', '[1, 2, 3]', 'Row'], ctx)).toEqual([1, 2, 3]);
     });
 
     it('parses scalars', () => {
-      expect(evaluate(['json/parse', '42'], ctx)).toBe(42);
-      expect(evaluate(['json/parse', '"hello"'], ctx)).toBe('hello');
-      expect(evaluate(['json/parse', 'true'], ctx)).toBe(true);
-      expect(evaluate(['json/parse', 'null'], ctx)).toBe(null);
+      expect(evaluate(['json/parse', '42', 'Row'], ctx)).toBe(42);
+      expect(evaluate(['json/parse', '"hello"', 'Row'], ctx)).toBe('hello');
+      expect(evaluate(['json/parse', 'true', 'Row'], ctx)).toBe(true);
+      expect(evaluate(['json/parse', 'null', 'Row'], ctx)).toBe(null);
     });
 
     it('parses nested structures', () => {
       const s = '{"rows": [{"id": 1, "tags": ["a", "b"]}], "meta": {"count": 1}}';
-      expect(evaluate(['json/parse', s], ctx)).toEqual({
+      expect(evaluate(['json/parse', s, 'Row'], ctx)).toEqual({
         rows: [{ id: 1, tags: ['a', 'b'] }],
         meta: { count: 1 },
       });
     });
 
     it('returns null for invalid JSON (never throws)', () => {
-      expect(evaluate(['json/parse', '{not json'], ctx)).toBe(null);
-      expect(evaluate(['json/parse', ''], ctx)).toBe(null);
-      expect(evaluate(['json/parse', 'undefined'], ctx)).toBe(null);
+      expect(evaluate(['json/parse', '{not json', 'Row'], ctx)).toBe(null);
+      expect(evaluate(['json/parse', '', 'Row'], ctx)).toBe(null);
+      expect(evaluate(['json/parse', 'undefined', 'Row'], ctx)).toBe(null);
     });
 
-    it('returns null for non-string input', () => {
-      expect(evaluate(['json/parse', 42], ctx)).toBe(null);
-      expect(evaluate(['json/parse', null], ctx)).toBe(null);
-      expect(evaluate(['json/parse', { a: 1 }], ctx)).toBe(null);
-      expect(evaluate(['json/parse', [1, 2]], ctx)).toBe(null);
+    it('returns null for an absent input and raises the typed mismatch for a non-string', () => {
+      expect(evaluate(['json/parse', null, 'Row'], ctx)).toBe(null);
+      expect(() => evaluate(['json/parse', 42, 'Row'], ctx)).toThrow('Type mismatch: expected string, got number');
+      expect(() => evaluate(['json/parse', { a: 1 }, 'Row'], ctx)).toThrow('Type mismatch: expected string, got object');
+      expect(() => evaluate(['json/parse', [1, 2], 'Row'], ctx)).toThrow('Type mismatch: expected string, got array');
     });
   });
 
@@ -70,7 +70,7 @@ describe('json/* operators', () => {
       const value = { id: 7, name: 'row', flags: [true, false], nested: { deep: null } };
       const s = evaluate(['json/stringify', value], ctx);
       if (typeof s !== 'string') throw new Error('json/stringify did not return a string');
-      expect(evaluate(['json/parse', s], ctx)).toEqual(value);
+      expect(evaluate(['json/parse', s, 'Row'], ctx)).toEqual(value);
     });
   });
 });

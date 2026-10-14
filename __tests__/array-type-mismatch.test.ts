@@ -7,11 +7,11 @@ import { evaluate, EvalTypeMismatchError } from '../index.js';
 import { createMinimalContext } from '../context.js';
 
 const keep: SExpr = ['fn', 'x', true];
-const twice: SExpr = ['fn', 'x', ['*', '@x', 2]];
+const identity: SExpr = ['fn', 'x', '@x'];
 
 /** Every operator orbital-core guards with `require_array!`, called on `input`. */
 const GUARDED: Array<[string, (input: SExpr) => SExpr]> = [
-  ['array/map', (a) => ['array/map', a, twice]],
+  ['array/map', (a) => ['array/map', a, identity]],
   ['array/filter', (a) => ['array/filter', a, keep]],
   ['array/reject', (a) => ['array/reject', a, keep]],
   ['array/find', (a) => ['array/find', a, keep]],
@@ -63,8 +63,15 @@ describe('array operators on a non-array raise TypeMismatch (orbital-core requir
     expect(mismatch(call(null))?.actual).toBe('null');
   });
 
-  it.each(GUARDED)('control: %s on an array does not raise', (_op, call) => {
-    expect(() => evaluate(call(['list', { kind: 'a' }, { kind: 'b' }]), createMinimalContext())).not.toThrow(EvalTypeMismatchError);
+  it.each(GUARDED)('control: %s on an array does not raise', (op, call) => {
+    // The element type is the signature's `T`: the items the operator adds must match it, and `array/flatten` takes a list of lists.
+    const input: SExpr = op === 'array/flatten' ? ['list', ['list', 1], ['list', 2]] : ['list', 1, 2];
+    expect(() => evaluate(call(input), createMinimalContext())).not.toThrow(EvalTypeMismatchError);
+  });
+
+  it('an item of another type than the list element raises the typed mismatch', () => {
+    expect(mismatch(['array/append', ['list', 1, 2], 'x'])?.message).toBe('Type mismatch: expected number, got string');
+    expect(mismatch(['array/includes', ['list', 'a'], 1])?.message).toBe('Type mismatch: expected string, got number');
   });
 
   it('edge: an object and a number name their own type', () => {
@@ -74,7 +81,7 @@ describe('array operators on a non-array raise TypeMismatch (orbital-core requir
   });
 
   it('edge: an unbound binding is null, as in the compiled path', () => {
-    expect(mismatch(['array/map', '@entity.missing', twice])?.actual).toBe('null');
+    expect(mismatch(['array/map', '@entity.missing', identity])?.actual).toBe('null');
   });
 
   it('control: operators orbital-core leaves lenient stay lenient', () => {

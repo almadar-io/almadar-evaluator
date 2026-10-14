@@ -14,6 +14,7 @@ import type { EvaluationContext, Evaluator } from './context.js';
 import type { EvalTrace, RuntimeValue, SExprPath } from '@almadar/core';
 import { decodeQuoteBody } from '@almadar/core';
 import { resolveBinding } from './context.js';
+import { operatorSignature, withArgChecks } from './operator-arg-types.js';
 
 // Import operators
 import {
@@ -80,6 +81,7 @@ import * as stdStr from './std/str.js';
 import * as stdArray from './std/array.js';
 import * as stdObject from './std/object.js';
 import * as stdJson from './std/json.js';
+import * as stdCsv from './std/csv.js';
 import * as stdValidate from './std/validate.js';
 import * as stdTime from './std/time.js';
 import * as stdFormat from './std/format.js';
@@ -387,6 +389,7 @@ const OPERATOR_TABLE: Record<string, OpImpl> = {
   'path': stdObject.evalPath,
   'json/parse': stdJson.evalJsonParse,
   'json/stringify': stdJson.evalJsonStringify,
+  'csv/parse': stdCsv.evalCsvParse,
   'validate/required': stdValidate.evalValidateRequired,
   'validate/string': stdValidate.evalValidateString,
   'validate/number': stdValidate.evalValidateNumber,
@@ -706,7 +709,10 @@ export class SExpressionEvaluator {
           return f !== undefined ? f(ctx) : this.interpret(item as SExpr, ctx);
         });
       } else {
-        fn = (ctx) => impl(args, dispatch, ctx);
+        const signature = operatorSignature(op);
+        fn = signature === undefined
+          ? (ctx) => impl(args, dispatch, ctx)
+          : (ctx) => impl(args, withArgChecks(signature, args, dispatch), ctx);
       }
     }
     into.set(expr, fn);
@@ -882,7 +888,8 @@ export class SExpressionEvaluator {
     assertOperatorArity(op, args.length);
     const impl = OPERATOR_TABLE[op];
     if (impl === undefined) return UNKNOWN_OPERATOR;
-    return impl(args, evaluate, ctx);
+    const signature = operatorSignature(op);
+    return impl(args, signature === undefined ? evaluate : withArgChecks(signature, args, evaluate), ctx);
   }
 }
 
